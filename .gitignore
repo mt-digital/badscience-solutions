@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+scimod-agency.so
+scimod-agency.dylib
+scimod-agency.dll
+scimod-agency.a
+scimod-agency.lib
+scimod-agency-test-*
+*.exe
+*.o
+*.obj
+*.lst
+scimod-agency
+dub.selections.json
