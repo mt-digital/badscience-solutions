@@ -14,3 +14,4 @@ scimod-agency-test-*
 *.lst
 scimod-agency
 dub.selections.json
+*data*

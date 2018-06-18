@@ -2,12 +2,16 @@ import core.thread;
 
 import std.algorithm;
 import std.array;
+import std.container.slist;
 import std.conv;
 import std.getopt;
+import std.json;
 import std.parallelism;
+import std.path;
 import std.random: randomSample;
 import std.range;
 import std.stdio;
+import std.uuid;
 
 import mir.random;
 import mir.random.engine;
@@ -15,30 +19,104 @@ import mir.random.variable;
 import mir.math.common: fabs;
 import mir.random.algorithm: range, RandomRange, sample;
 
+import vibe.d;
+
 
 alias RandomRange!(threadLocal!Random, UniformVariable!double) UniformRange;
 alias RandomRange!(threadLocal!Random, NormalVariable!double) NormalRange;
 
 
-void main () {
-    writefln("Random enum: %s", AwardPolicy.RANDOM.to!string);
+const size_t N_TRIALS = 20;
+void main (string[] args) {
+    
+    size_t N_ITER = 1e6.to!size_t;
+    double baseRate = 0.1;
+    double fprMutationRate = 0.8;
+    double fprMutationMagnitude = 0.05;
+    AwardPolicy policy = AwardPolicy.PUBLICATIONS;
+
+    auto helpInformation = getopt(
+        args,
+        std.getopt.config.passThrough,
+        "baseRate", "Base rate of true hypotheses", 
+            &baseRate,
+        "fprMutationRate", "How often the false positive rate mutates", 
+            &fprMutationRate,
+        "fprMutationMagnitude", "Std. dev. of the false positive mutations",
+            &fprMutationMagnitude,
+        "policy", "One of: RANDOM, PUBLICATIONS, FPR", 
+            &policy
+    );
+
+    if (helpInformation.helpWanted)
+    {
+        defaultGetoptPrinter(
+            "SCIMOD\n./scimod-agency WRITE_DIR <OPTIONS>\nOptions:",
+            helpInformation.options
+        );
+        return;
+    }
+    string writeDir = args[1];
+
+    /****** RUN MANY IN PARALLEL ******/
+    defaultPoolThreads(3);
+    /* foreach (policy; [AwardPolicy.RANDOM, AwardPolicy.PUBLICATIONS]) */
+    /* { */
+
+    /* writeln("Running policy ", policy); */
+    foreach (i; parallel(N_TRIALS.iota))
+    {
+        writefln("running %d of %d", ++i, N_TRIALS);
+
+        string fileName = 
+            buildPath(
+                writeDir, 
+                randomUUID().to!string ~ ".json"
+            );
+
+        simulation(
+            fileName, policy, baseRate, fprMutationRate, fprMutationMagnitude
+        );
+        /* } */
+    }
+
+
+    /****** RUN ONE ******/
+    /* simulation("test.json"); */
 }
 
 
 
-size_t N_PI = 100;
-size_t N_ITER = 1_000_000;
+const size_t N_PI = 100;
+size_t N_ITER = 1e6.to!size_t;
 size_t SYNC_EVERY = 2000;
-void simulation(string writePath) 
+void simulation(string writePath, AwardPolicy policy,
+                double baseRate, double fprMutationRate, 
+                double fprMutationMagnitude) 
 {
     PI[] pis; 
-    PI newPi;
 
-    auto fprMutationAmountRange = normalVar(0.0, FALSE_POS_RATE_MUTATION_SD).range;
+    auto fprMutationAmountRange = 
+        normalVar(0.0, fprMutationMagnitude).range;
+
     auto mutateFprNowRange = uniformVar(0.0, 1.0).range;
 
     foreach (_; 0..N_PI)
         pis ~= new PI();
+
+    TimeseriesData data;
+
+    data.metadata.syncEvery = SYNC_EVERY;
+    data.metadata.policy = policy.to!string;
+    data.metadata.parameters = [
+        "baseRate": baseRate,
+        "fprMutationRate": fprMutationRate,
+        "fprMutationMagnitude": fprMutationMagnitude
+    ];
+
+    data.funds.length = N_ITER / SYNC_EVERY;
+    data.falsePositiveRate.length = N_ITER / SYNC_EVERY;
+    data.nPublications.length = N_ITER / SYNC_EVERY;
 
     foreach (iter; 0..N_ITER)
     {
@@ -46,15 +124,29 @@ void simulation(string writePath)
         pis.doScience;
              
         // Agency reviews "grant applications".
-        pis.applyForGrants;
+        pis.applyForGrants(policy);
 
         // Select a PI to reproduce and a PI to die.
-        pis.evolve(mutateFprNowRange, fprMutationAmountRange);
+        pis.evolve(mutateFprNowRange, fprMutationAmountRange, fprMutationRate);
+        mutateFprNowRange.popFront();
+        fprMutationAmountRange.popFront();
 
-        if (iter % SYNC_EVERY == 0) {
-            pis.writeState(writePath);
+        if (iter % SYNC_EVERY == 0) 
+        {
+            size_t syncIdx = iter / SYNC_EVERY;
+
+            data.funds[syncIdx].length = N_PI;
+            data.falsePositiveRate[syncIdx].length = N_PI;
+            data.nPublications[syncIdx].length = N_PI;
+
+            data.funds[syncIdx][] = pis.map!"a.funds".array;
+            data.falsePositiveRate[syncIdx][] = 
+                pis.map!"a.falsePositiveRate".array;
+            data.nPublications[syncIdx][] = pis.map!"a.publications".array;
         }
     }
+
+    File(writePath, "w").write(data.serializeToJsonString);
 }
 
 
@@ -65,18 +157,12 @@ private void doScience(PI[] pis)
 }
 
 
-private void writeState(PI[] pis, string writeDir) 
-{
-    // TODO
-}
-
-
 /****************** PRINCIPAL INVESTIGATOR *******************/
 const static double SCIENCE_COST = 1.0;
 const static double INIT_FUNDS = 100.0;
 const double INIT_POWER = 0.5;
 const double BASE_RATE = 0.5;
-const static double INIT_FALSE_POS_RATE = 0.6;
+const static double INIT_FALSE_POS_RATE = 0.1;
 class PI {
     double funds = INIT_FUNDS;
     double power = INIT_POWER;
@@ -112,6 +198,7 @@ class PI {
     void reset()
     {
         this.funds = INIT_FUNDS;
+        this.publications = 0;
         this.age = 0;
     }
 
@@ -126,7 +213,6 @@ class PI {
         }
 }
 unittest {
-    writeln("Running tests!");
     PI pi = new PI();
     assert (pi.detectionRate == 0.25 + 0.3);
 }
@@ -145,7 +231,6 @@ private void applyForGrants(PI[] pis, AwardPolicy policy=AwardPolicy.RANDOM)
         case AwardPolicy.RANDOM: 
 
             applicants
-                .randomSample(1)
                 .front
                 .addFunds();
             break;
@@ -174,7 +259,8 @@ const size_t N_TO_REPRODUCE = 10;
 private void evolve(
         PI[] pis, 
         UniformRange mutateFprNowRange,
-        NormalRange fprMutationAmountRange
+        NormalRange fprMutationAmountRange,
+        double fprMutationRate
     )
 {
     // "Kill" oldest PI.
@@ -186,31 +272,55 @@ private void evolve(
                             .maxElement!"a.publications";
 
     piToReproduce.reproduce(
-        resetPI, mutateFprNowRange, fprMutationAmountRange
+        resetPI, mutateFprNowRange, fprMutationAmountRange, fprMutationRate
     );
 }
 
 
-const double FALSE_POS_RATE_MUTATION_SD = 0.01;
-const double FALSE_POS_RATE_MUTATION_PROBABILITY = 0.01;
 private void reproduce(
         PI piToReproduce, 
         PI resetPI, 
         UniformRange mutateFprNowRange,
-        NormalRange fprMutationAmountRange
+        NormalRange fprMutationAmountRange,
+        double fprMutationRate
     )
 {
     double mutateAmt;
-    bool mutate = mutateFprNowRange.front < FALSE_POS_RATE_MUTATION_PROBABILITY;
-    mutateFprNowRange.popFront();
+    bool mutate = mutateFprNowRange.front < fprMutationRate;
+    
     if (mutate) 
     {
         // Get mutation amount and generate a new random FPR mutation value.
         mutateAmt = fprMutationAmountRange.front;
-        fprMutationAmountRange.popFront();
 
         // Set FPR of the reset PI as the reproducing PI's FPR plus mutation.
         resetPI.falsePositiveRate = 
             piToReproduce.falsePositiveRate + mutateAmt;
+        if (resetPI.falsePositiveRate > 1.0)
+        {
+            resetPI.falsePositiveRate = 1.0;
+        }
+        else if (resetPI.falsePositiveRate < 0.0)
+        {
+            resetPI.falsePositiveRate = 0.0;
+        }
     }
+}
+
+
+struct TimeseriesData
+{
+    Metadata metadata;
+    double[][] funds;
+    double[][] falsePositiveRate;
+    size_t[][] nPublications;
+}
+
+
+struct Metadata
+{
+    double baseRate = 0.1;
+    size_t syncEvery;
+    string policy;
+    double[string] parameters;
 }

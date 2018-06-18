@@ -6,5 +6,8 @@
 	"description": "Funding agency policy and quality of scientific work.",
 	"copyright": "Copyright © 2018, Matthew Turner",
 	"license": "BSD-3",
-        "dependencies": {"mir-random": "~>0.4.0", "json": "~>0.3.0"}
+        "dependencies": {
+            "mir-random": "~>0.4.0",
+            "vibe-d": "~>0.8.4"
+        }
 }
