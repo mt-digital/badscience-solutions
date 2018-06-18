@@ -12,6 +12,7 @@ import std.random: randomSample;
 import std.range;
 import std.stdio;
 import std.uuid;
+import std.zlib: compress;
 
 import mir.random;
 import mir.random.engine;
@@ -30,6 +31,7 @@ const size_t N_TRIALS = 20;
 void main (string[] args) {
     
     size_t N_ITER = 1e6.to!size_t;
+    size_t nTrials = 10;
     double baseRate = 0.1;
     double fprMutationRate = 0.8;
     double fprMutationMagnitude = 0.05;
@@ -38,6 +40,8 @@ void main (string[] args) {
     auto helpInformation = getopt(
         args,
         std.getopt.config.passThrough,
+        "nTrials", "Number of trials to run", 
+            &nTrials,
         "baseRate", "Base rate of true hypotheses", 
             &baseRate,
         "fprMutationRate", "How often the false positive rate mutates", 
@@ -60,25 +64,45 @@ void main (string[] args) {
 
     /****** RUN MANY IN PARALLEL ******/
     defaultPoolThreads(3);
-    /* foreach (policy; [AwardPolicy.RANDOM, AwardPolicy.PUBLICATIONS]) */
-    /* { */
 
-    /* writeln("Running policy ", policy); */
-    foreach (i; parallel(N_TRIALS.iota))
+    TrialsData data;
+    data.metadata.syncEvery = SYNC_EVERY;
+    data.metadata.policy = policy.to!string;
+    data.metadata.parameters = [
+        "baseRate": baseRate,
+        "fprMutationRate": fprMutationRate,
+        "fprMutationMagnitude": fprMutationMagnitude,
+        "nTrials": nTrials,
+        "nIterations": N_ITER
+    ];
+
+    data.funds.length = nTrials;
+    data.falsePositiveRate.length = nTrials;
+    data.nPublications.length = nTrials;
+
+    /* data.funds[0].length = N_ITER / SYNC_EVERY; */
+    /* data.falsePositiveRate[0].length = N_ITER / SYNC_EVERY; */
+    /* data.nPublications[0].length = N_ITER / SYNC_EVERY; */
+
+    foreach (trialIdx; parallel(nTrials.iota))
     {
-        writefln("running %d of %d", ++i, N_TRIALS);
+        writefln("running %d of %d", trialIdx + 1, nTrials);
 
-        string fileName = 
-            buildPath(
-                writeDir, 
-                randomUUID().to!string ~ ".json"
-            );
-
-        simulation(
-            fileName, policy, baseRate, fprMutationRate, fprMutationMagnitude
+        TimeseriesData thisTrialData = simulation(
+            policy, baseRate, fprMutationRate, fprMutationMagnitude,
+            trialIdx
         );
-        /* } */
+
+        data.funds[trialIdx] = thisTrialData.funds;
+        data.falsePositiveRate[trialIdx] = thisTrialData.falsePositiveRate;
+        data.nPublications[trialIdx] = thisTrialData.nPublications;
     }
+
+    writeDir
+        .buildPath(randomUUID().to!string ~ ".json")
+        .File("w").write(
+            data.serializeToJsonString
+        );
 
 
     /****** RUN ONE ******/
@@ -90,9 +114,10 @@ void main (string[] args) {
 const size_t N_PI = 100;
 size_t N_ITER = 1e6.to!size_t;
 size_t SYNC_EVERY = 2000;
-void simulation(string writePath, AwardPolicy policy,
+TimeseriesData simulation(AwardPolicy policy,
                 double baseRate, double fprMutationRate, 
-                double fprMutationMagnitude) 
+                double fprMutationMagnitude,
+                size_t trialIdx) 
 {
     PI[] pis; 
 
@@ -105,15 +130,6 @@ void simulation(string writePath, AwardPolicy policy,
         pis ~= new PI();
 
     TimeseriesData data;
-
-    data.metadata.syncEvery = SYNC_EVERY;
-    data.metadata.policy = policy.to!string;
-    data.metadata.parameters = [
-        "baseRate": baseRate,
-        "fprMutationRate": fprMutationRate,
-        "fprMutationMagnitude": fprMutationMagnitude
-    ];
-
     data.funds.length = N_ITER / SYNC_EVERY;
     data.falsePositiveRate.length = N_ITER / SYNC_EVERY;
     data.nPublications.length = N_ITER / SYNC_EVERY;
@@ -146,7 +162,7 @@ void simulation(string writePath, AwardPolicy policy,
         }
     }
 
-    File(writePath, "w").write(data.serializeToJsonString);
+    return data;
 }
 
 
@@ -307,10 +323,17 @@ private void reproduce(
     }
 }
 
+struct TrialsData
+{
+    Metadata metadata;
+    double[][][] funds;
+    double[][][] falsePositiveRate;
+    size_t[][][] nPublications;
+}
+
 
 struct TimeseriesData
 {
-    Metadata metadata;
     double[][] funds;
     double[][] falsePositiveRate;
     size_t[][] nPublications;
