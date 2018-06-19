@@ -9,21 +9,16 @@
 # Example:
 #
 # qsub -S /bin/bash -q fast.q -cwd -j y -V -l mem_free=96G \
-#     -pe smp 20 -N mutation_params -o params.log -e params.err \
+#     -pe smp 20 -N mutation_funding -o funding.log -e funding.err \
 #     ./run_funding_experiment.sh testData
 
 
 for policy in RANDOM PUBLICATIONS FPR; do
-    for awardAmount in `seq 55 5 95`; do
+    for awardAmount in  `seq 10 5 205`; do # 40 x 3 = 120 total
 
         echo "Running policy=$policy and awardAmount=$awardAmount"
 
-        ./scimod-agency $1 \
-            --fprMutationRate=0.1 \
-            --fprMutationMagnitude=0.01 \
-            --policy=$policy \
-            --awardAmount=$awardAmount \
-            --initialFalsePositiveRate=0.5 \
-            --nTrials=3
+        qsub -S /bin/bash -q fast.q -cwd -j y -V -l mem_free=96G -pe smp 20 -N funding -o funding.log -e funding.err funding_trials_qsub.sh $policy $awardAmount
+
     done
 done
