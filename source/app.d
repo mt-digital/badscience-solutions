@@ -234,7 +234,7 @@ unittest {
 
 
 /********* GRANT APPLICATIONS **********/
-enum AwardPolicy {RANDOM, PUBLICATIONS}; 
+enum AwardPolicy {RANDOM, PUBLICATIONS, FPR}; 
 
 
 const static size_t N_APPLICANTS = 10;
@@ -254,6 +254,13 @@ private void applyForGrants(PI[] pis, AwardPolicy policy=AwardPolicy.RANDOM)
 
             applicants
                 .maxElement!"a.publications"
+                .addFunds();
+            break;
+
+        case AwardPolicy.FPR:
+
+            applicants
+                .minElement!"a.falsePositiveRate"
                 .addFunds();
             break;
     }
