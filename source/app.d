@@ -28,27 +28,30 @@ alias RandomRange!(threadLocal!Random, NormalVariable!double) NormalRange;
 
 
 const size_t N_TRIALS = 20;
-void main (string[] args) {
+int main (string[] args) {
     
     size_t N_ITER = 1e6.to!size_t;
     size_t nTrials = 10;
+    double awardAmount = 50.0;
     double baseRate = 0.1;
-    double fprMutationRate = 0.8;
-    double fprMutationMagnitude = 0.05;
+    double fprMutationRate = 0.25;
+    double fprMutationMagnitude = 0.01;
     AwardPolicy policy = AwardPolicy.PUBLICATIONS;
 
     auto helpInformation = getopt(
         args,
         std.getopt.config.passThrough,
-        "nTrials", "Number of trials to run", 
+        "nTrials", "Number of trials to run (default 10)", 
             &nTrials,
-        "baseRate", "Base rate of true hypotheses", 
+        "baseRate", "Base rate of true hypotheses (default 0.1)", 
             &baseRate,
-        "fprMutationRate", "How often the false positive rate mutates", 
+        "awardAmount", "Amount given to grant-winning lab in a timestep (default 50)", 
+            &awardAmount,
+        "fprMutationRate", "How often the false positive rate mutates (default 0.25)", 
             &fprMutationRate,
-        "fprMutationMagnitude", "Std. dev. of the false positive mutations",
+        "fprMutationMagnitude", "Std. dev. of the false positive mutations (default 0.01)",
             &fprMutationMagnitude,
-        "policy", "One of: RANDOM, PUBLICATIONS, FPR", 
+        "policy", "One of: RANDOM, PUBLICATIONS, FPR (default PUBLICATIONS)", 
             &policy
     );
 
@@ -58,7 +61,12 @@ void main (string[] args) {
             "SCIMOD\n./scimod-agency WRITE_DIR <OPTIONS>\nOptions:",
             helpInformation.options
         );
-        return;
+        return 0;
+    }
+
+    if (args.length == 1) {
+        writeln("Write directory not provided!");
+        return 1;
     }
     string writeDir = args[1];
 
@@ -71,6 +79,7 @@ void main (string[] args) {
         "baseRate": baseRate,
         "fprMutationRate": fprMutationRate,
         "fprMutationMagnitude": fprMutationMagnitude,
+        "awardAmount": awardAmount,
         "nTrials": nTrials,
         "nIterations": N_ITER
     ];
@@ -79,17 +88,13 @@ void main (string[] args) {
     data.falsePositiveRate.length = nTrials;
     data.nPublications.length = nTrials;
 
-    /* data.funds[0].length = N_ITER / SYNC_EVERY; */
-    /* data.falsePositiveRate[0].length = N_ITER / SYNC_EVERY; */
-    /* data.nPublications[0].length = N_ITER / SYNC_EVERY; */
-
     foreach (trialIdx; parallel(nTrials.iota))
     {
         writefln("running %d of %d", trialIdx + 1, nTrials);
 
         TimeseriesData thisTrialData = simulation(
-            policy, baseRate, fprMutationRate, fprMutationMagnitude,
-            trialIdx
+            policy, awardAmount, baseRate, fprMutationRate, 
+            fprMutationMagnitude, trialIdx
         );
 
         data.funds[trialIdx] = thisTrialData.funds;
@@ -103,7 +108,7 @@ void main (string[] args) {
             data.serializeToJsonString
         );
 
-
+    return 0;
     /****** RUN ONE ******/
     /* simulation("test.json"); */
 }
@@ -114,9 +119,8 @@ const size_t N_PI = 100;
 size_t N_ITER = 1e6.to!size_t;
 size_t SYNC_EVERY = 2000;
 TimeseriesData simulation(AwardPolicy policy,
-                double baseRate, double fprMutationRate, 
-                double fprMutationMagnitude,
-                size_t trialIdx) 
+                double awardAmount, double baseRate, double fprMutationRate, 
+                double fprMutationMagnitude, size_t trialIdx) 
 {
     PI[] pis; 
 
@@ -125,8 +129,11 @@ TimeseriesData simulation(AwardPolicy policy,
 
     auto mutateFprNowRange = uniformVar(0.0, 1.0).range;
 
-    foreach (_; 0..N_PI)
+    foreach (i; 0..N_PI)
+    {
         pis ~= new PI();
+        pis[i].funds = awardAmount;
+    }
 
     TimeseriesData data;
     data.funds.length = N_ITER / SYNC_EVERY;
@@ -139,10 +146,11 @@ TimeseriesData simulation(AwardPolicy policy,
         pis.doScience;
              
         // Agency reviews "grant applications".
-        pis.applyForGrants(policy);
+        pis.applyForGrants(awardAmount, policy);
 
         // Select a PI to reproduce and a PI to die.
-        pis.evolve(mutateFprNowRange, fprMutationAmountRange, fprMutationRate);
+        pis.evolve(mutateFprNowRange, fprMutationAmountRange, 
+                   awardAmount, fprMutationRate);
         mutateFprNowRange.popFront();
         fprMutationAmountRange.popFront();
 
@@ -174,7 +182,7 @@ private void doScience(PI[] pis)
 
 /****************** PRINCIPAL INVESTIGATOR *******************/
 const static double SCIENCE_COST = 1.0;
-const static double INIT_FUNDS = 100.0;
+const static double INIT_FUNDS = 20.0;
 const double INIT_POWER = 0.5;
 const double BASE_RATE = 0.5;
 const static double INIT_FALSE_POS_RATE = 0.1;
@@ -201,10 +209,10 @@ class PI {
     {
         if (this.funds > SCIENCE_COST) 
         {
+            this.funds -= SCIENCE_COST;
             if (positiveResult()) 
             {
                 this.publications += 1;
-                this.funds -= SCIENCE_COST;
             }
         }
         ++age;
@@ -238,7 +246,7 @@ enum AwardPolicy {RANDOM, PUBLICATIONS, FPR};
 
 
 const static size_t N_APPLICANTS = 10;
-private void applyForGrants(PI[] pis, AwardPolicy policy=AwardPolicy.RANDOM) 
+private void applyForGrants(PI[] pis, double awardAmount, AwardPolicy policy=AwardPolicy.RANDOM) 
 {
     auto applicants = randomSample(pis, N_APPLICANTS);
     final switch (policy) 
@@ -247,28 +255,27 @@ private void applyForGrants(PI[] pis, AwardPolicy policy=AwardPolicy.RANDOM)
 
             applicants
                 .front
-                .addFunds();
+                .addFunds(awardAmount);
             break;
 
         case AwardPolicy.PUBLICATIONS:
 
             applicants
                 .maxElement!"a.publications"
-                .addFunds();
+                .addFunds(awardAmount);
             break;
 
         case AwardPolicy.FPR:
 
             applicants
                 .minElement!"a.falsePositiveRate"
-                .addFunds();
+                .addFunds(awardAmount);
             break;
     }
 }
 
 
-const double AWARD_AMOUNT = 100.0;
-private void addFunds(PI pi, double amount=AWARD_AMOUNT)
+private void addFunds(PI pi, double amount)
 {
     pi.funds += amount;
 }
@@ -282,12 +289,14 @@ private void evolve(
         PI[] pis, 
         UniformRange mutateFprNowRange,
         NormalRange fprMutationAmountRange,
+        double initialFunds,
         double fprMutationRate
     )
 {
     // "Kill" oldest PI.
     auto resetPI = pis.randomSample(N_TO_DIE).maxElement!"a.age";
     resetPI.reset();
+    resetPI.funds = initialFunds;
     
     // Reproduce the one with most funding from ten chosen at random.
     auto piToReproduce = pis.randomSample(N_TO_REPRODUCE)
