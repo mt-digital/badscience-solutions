@@ -150,14 +150,14 @@ TimeseriesData simulation(AwardPolicy policy,
         {
             size_t syncIdx = iter / SYNC_EVERY;
 
-            data.funds[syncIdx].length = N_PI;
-            data.falsePositiveRate[syncIdx].length = N_PI;
-            data.nPublications[syncIdx].length = N_PI;
+            data.funds[syncIdx] = 
+                pis.map!"a.funds".array.mean;
 
-            data.funds[syncIdx][] = pis.map!"a.funds".array;
-            data.falsePositiveRate[syncIdx][] = 
-                pis.map!"a.falsePositiveRate".array;
-            data.nPublications[syncIdx][] = pis.map!"a.publications".array;
+            data.falsePositiveRate[syncIdx] = 
+                pis.map!"a.falsePositiveRate".array.mean;
+
+            data.nPublications[syncIdx] = 
+                pis.map!"a.publications".array.mean;
         }
     }
 
@@ -325,17 +325,17 @@ private void reproduce(
 struct TrialsData
 {
     Metadata metadata;
-    double[][][] funds;
-    double[][][] falsePositiveRate;
-    size_t[][][] nPublications;
+    double[][] funds;
+    double[][] falsePositiveRate;
+    double[][] nPublications;
 }
 
 
 struct TimeseriesData
 {
-    double[][] funds;
-    double[][] falsePositiveRate;
-    size_t[][] nPublications;
+    double[] funds;
+    double[] falsePositiveRate;
+    double[] nPublications;
 }
 
 
