@@ -63,8 +63,7 @@ void main (string[] args) {
     string writeDir = args[1];
 
     /****** RUN MANY IN PARALLEL ******/
-    defaultPoolThreads(3);
-
+    defaultPoolThreads(totalCPUs);
     TrialsData data;
     data.metadata.syncEvery = SYNC_EVERY;
     data.metadata.policy = policy.to!string;
