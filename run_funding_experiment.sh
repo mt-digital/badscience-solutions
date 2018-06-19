@@ -14,15 +14,16 @@
 
 
 for policy in RANDOM PUBLICATIONS FPR; do
-    for awardAmount in 10 50 100; do
+    for awardAmount in `seq 55 5 95`; do
 
         echo "Running policy=$policy and awardAmount=$awardAmount"
 
         ./scimod-agency $1 \
-            --fprMutationRate=0.25 \
+            --fprMutationRate=0.1 \
             --fprMutationMagnitude=0.01 \
             --policy=$policy \
             --awardAmount=$awardAmount \
+            --initialFalsePositiveRate=0.5 \
             --nTrials=3
     done
 done

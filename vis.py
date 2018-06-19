@@ -1,3 +1,6 @@
+import warnings
+warnings.simplefilter('ignore')
+
 import json
 import matplotlib.pyplot as plt
 import numpy as np
@@ -70,5 +73,51 @@ def plot_means(data_dir='data', policies=POLICIES):
     return results_df
 
 
-def plot_mutation_parameters():
-    pass
+def plot_award_experiment(experiment_dir='awardAmounts', save_path=None,
+                          low_funding=50, high_funding=100, figsize=(8, 2)):
+
+    jsons = [json.load(open(f))
+             for f in glob(os.path.join(experiment_dir, '*.json'))]
+
+    def _get_amount(json_):
+        return json_['metadata']['parameters']['awardAmount']
+
+    fpr_dict = {
+        (_get_amount(j), j['metadata']['policy']):
+        np.mean(j['falsePositiveRate'], axis=0)
+        for j in jsons
+        if low_funding <= _get_amount(j) and _get_amount(j) <= high_funding
+    }
+
+    amounts = list({_get_amount(j) for j in jsons})
+    amounts.sort()
+    amounts = [
+        el for el in amounts
+        if low_funding <= el and el <= high_funding
+    ]
+
+    n_amounts = len(amounts)
+
+    fig, axes = plt.subplots(nrows=1, ncols=n_amounts, figsize=figsize)
+
+    t = np.arange(0, 1e6, 2000)
+    labels = ['Random', 'Publications', 'False pos. rate']
+    colors = ['red', 'blue', 'black']
+    for idx, amount in enumerate(amounts):
+        ax = axes[idx]
+        for p_idx, policy in enumerate(['RANDOM', 'PUBLICATIONS', 'FPR']):
+            ax.plot(t, fpr_dict[(amount, policy)], color=colors[p_idx],
+                    label=labels[p_idx])
+
+        ax.set_title(r'$G={}$'.format(amount))
+
+        ax.set_ylim(0.0, 1.0)
+        ax.set_xticklabels(
+                ['{:1.0e}'.format(el) for idx, el in enumerate(ax.get_xticks())],
+                # rotation=30
+            )
+
+    if save_path is not None:
+        plt.savefig(save_path)
+
+    return jsons, fpr_dict

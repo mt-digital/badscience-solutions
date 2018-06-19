@@ -36,6 +36,7 @@ int main (string[] args) {
     double baseRate = 0.1;
     double fprMutationRate = 0.25;
     double fprMutationMagnitude = 0.01;
+    double initialFalsePositiveRate = 0.5;
     AwardPolicy policy = AwardPolicy.PUBLICATIONS;
 
     auto helpInformation = getopt(
@@ -47,6 +48,8 @@ int main (string[] args) {
             &baseRate,
         "awardAmount", "Amount given to grant-winning lab in a timestep (default 50)", 
             &awardAmount,
+        "initialFalsePositiveRate", "False positive rate of all PIs at t=0", 
+            &initialFalsePositiveRate,
         "fprMutationRate", "How often the false positive rate mutates (default 0.25)", 
             &fprMutationRate,
         "fprMutationMagnitude", "Std. dev. of the false positive mutations (default 0.01)",
@@ -93,8 +96,8 @@ int main (string[] args) {
         writefln("running %d of %d", trialIdx + 1, nTrials);
 
         TimeseriesData thisTrialData = simulation(
-            policy, awardAmount, baseRate, fprMutationRate, 
-            fprMutationMagnitude, trialIdx
+            policy, awardAmount, baseRate, initialFalsePositiveRate,
+            fprMutationRate, fprMutationMagnitude, trialIdx
         );
 
         data.funds[trialIdx] = thisTrialData.funds;
@@ -119,7 +122,8 @@ const size_t N_PI = 100;
 size_t N_ITER = 1e6.to!size_t;
 size_t SYNC_EVERY = 2000;
 TimeseriesData simulation(AwardPolicy policy,
-                double awardAmount, double baseRate, double fprMutationRate, 
+                double awardAmount, double baseRate, 
+                double initialFalsePositiveRate, double fprMutationRate, 
                 double fprMutationMagnitude, size_t trialIdx) 
 {
     PI[] pis; 
@@ -133,6 +137,7 @@ TimeseriesData simulation(AwardPolicy policy,
     {
         pis ~= new PI();
         pis[i].funds = awardAmount;
+        pis[i].falsePositiveRate = initialFalsePositiveRate;
     }
 
     TimeseriesData data;
