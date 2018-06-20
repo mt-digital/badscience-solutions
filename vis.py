@@ -25,7 +25,6 @@ def plot_simple(dataPath):
 
     metadata = j['metadata']
     df.plot()
-    print(metadata)
 
     return df
 
@@ -83,32 +82,97 @@ def _get_amount(json_):
     return json_['metadata']['parameters']['awardAmount']
 
 
-def plot_award_experiment(experiment_dir='awardAmounts', save_path=None,
-                          low_funding=50, high_funding=100, figsize=(8, 2)):
+def pub_plot_award_experiment(experiment_dir='../fundingExperiment',
+                              save_path=None, fundings=[], figsize=(7.5, 8.5)):
+
+    assert len(fundings) == 6
+    # Subplots dimensions.
+    nrows = 3
+    ncols = 2
 
     jsons = _get_jsons(experiment_dir)
 
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize,
+                             sharex=True, sharey=True)
+
+    for r_idx in range(nrows):
+
+        from_ = (ncols * r_idx)
+        to = (ncols * (r_idx + 1))
+        plot_award_experiment_row(
+            jsons=jsons,
+            fundings=fundings[from_:to],
+            axes=axes[r_idx]
+        )
+
+    axes[2, 1].legend(loc='lower right', fontsize=12)
+
+    # Customize axes.
+    lab_size = 15
+    axes[2, 0].set_xlabel(r'$t$', size=lab_size)
+    axes[2, 1].set_xlabel(r'$t$', size=lab_size)
+
+    for ax in axes[:, 0]:
+        ax.set_ylabel(r'$\alpha$', rotation=0, size=lab_size)
+        ax.yaxis.set_label_coords(-0.25, 0.5)
+
+    for ax in axes.flatten():
+        ax.set_yticks(np.arange(0.0, 1.01, 0.25))
+        ax.set_xticklabels(ax.get_xticklabels(), size=lab_size - 3)
+        ax.grid(axis='both')
+        ax.set_xlim(0.0, 1e6)
+        ax.set_xticks([0.0, 5e5, 1e6])
+        ax.set_xticklabels(['0', r'$5 \times 10^5$', r'$10^6$'], size=lab_size - 3)
+
+    if save_path is not None:
+        plt.savefig(save_path)
+
+
+def plot_award_experiment_row(
+            experiment_dir='fundingExperiment', jsons=None, save_path=None,
+            fundings=None, low_funding=50, high_funding=100,
+            figsize=(8, 2), axes=None
+        ):
+
+    if jsons is None:
+        jsons = _get_jsons(experiment_dir)
+
+    # Need to define how to check for desired funding amounts to plot.
+    if fundings is None:
+        def _funding_check(funding):
+            return (low_funding <= funding and funding <= high_funding)
+    else:
+        def _funding_check(funding):
+            return (funding in fundings)
+
+    # Build key=G, value=FPR-timeseries dictionary.
     fpr_dict = {
         (_get_amount(j), j['metadata']['policy']):
         np.mean(j['falsePositiveRate'], axis=0)
         for j in jsons
-        if low_funding <= _get_amount(j) and _get_amount(j) <= high_funding
+        if _funding_check(_get_amount(j))
     }
 
+    # Ascending ordered list of amounts.
     amounts = list({_get_amount(j) for j in jsons})
     amounts.sort()
     amounts = [
-        el for el in amounts
-        if low_funding <= el and el <= high_funding
+        amount for amount in amounts
+        if _funding_check(amount)
     ]
-
     n_amounts = len(amounts)
 
-    fig, axes = plt.subplots(nrows=1, ncols=n_amounts, figsize=figsize)
+    # If axes have not been passed as arg, create them.
+    if axes is None:
+        _, axes = plt.subplots(nrows=1, ncols=n_amounts, figsize=figsize)
 
+    # Ready plot parameters
     t = np.arange(0, 1e6, 2000)
     labels = ['Random', 'Publications', 'False pos. rate']
     colors = ['red', 'blue', 'black']
+
+    # Plot FPR timeseries for different values of G, G increases from left
+    # to right. Each subplot has three lines, one for each award policy.
     for idx, amount in enumerate(amounts):
         ax = axes[idx]
         for p_idx, policy in enumerate(['RANDOM', 'PUBLICATIONS', 'FPR']):
@@ -125,8 +189,6 @@ def plot_award_experiment(experiment_dir='awardAmounts', save_path=None,
 
     if save_path is not None:
         plt.savefig(save_path)
-
-    return jsons, fpr_dict
 
 
 def alpha_v_G(experiment_dir='fundingExperiment', save_path=None,
@@ -182,9 +244,58 @@ def alpha_v_G(experiment_dir='fundingExperiment', save_path=None,
     plt.yticks(np.arange(0, 1.1, 0.25))
 
     plt.xlabel(r'$G$', size=15)
-    plt.ylabel(r'$\alpha^*$', size=15, rotation=0)
+    plt.ylabel(r'$\alpha$', size=15, rotation=0)
     plt.gca().yaxis.set_label_coords(-0.15, 0.5)
     plt.gca().grid(axis='both')
 
     if save_path:
         plt.savefig(save_path)
+
+
+def pubs_v_fpr(experiment_dir='../fundingExperiment',
+                                  save_path=None, fundings=[10, 20, 50, 80, 90, 105],
+                                  figsize=(6, 4)):
+    jsons = _get_jsons(experiment_dir)
+
+    # fig, axes = plt.subplots(ncols=len(fundings))
+
+    def _funding_check(funding):
+        return (funding in fundings)
+
+    fpr_dict = {
+        _get_amount(j): {
+            'fpr': np.array(j['falsePositiveRate']),
+            'pubs': np.array(j['nPublications'])
+        }
+        for j in jsons
+        if _funding_check(_get_amount(j)) and j['metadata']['policy'] == 'FPR'
+    }
+
+    # Ascending ordered list of amounts.
+    amounts = list({_get_amount(j) for j in jsons})
+    amounts.sort()
+    amounts = [
+        amount for amount in amounts
+        if _funding_check(amount)
+    ]
+    n_amounts = len(amounts)
+
+    # for ax, amount in zip(axes, amounts):
+    for amount in amounts:
+        d = fpr_dict[amount]
+        # ax.plot(d['fpr'][:, -1], d['pubs'][:, -1], 'o')
+        plt.plot(d['fpr'][:, -1], d['pubs'][:, -1], 'o',
+                 label=r'$G={}$'.format(amount), alpha=0.6)
+        # ax.set_title(r'$G={}$'.format(amount))
+    plt.legend(fontsize=10, ncol=2)
+    plt.xlabel(r'False positive rate at $t=T$', size=14)
+    plt.ylabel(r'Publications at $t=T$', size=14)
+    plt.title('Agency policy: least FPR', size=14)
+
+    plt.gca().grid(axis='both')
+    plt.gca().tick_params(axis='both', labelsize=12)
+
+    if save_path is not None:
+        plt.savefig(save_path)
+
+    return fpr_dict
