@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+import pickle
 
 from glob import glob
 
@@ -73,14 +74,19 @@ def plot_means(data_dir='data', policies=POLICIES):
     return results_df
 
 
+def _get_jsons(experiment_dir):
+    return [json.load(open(f))
+            for f in glob(os.path.join(experiment_dir, '*.json'))]
+
+
+def _get_amount(json_):
+    return json_['metadata']['parameters']['awardAmount']
+
+
 def plot_award_experiment(experiment_dir='awardAmounts', save_path=None,
                           low_funding=50, high_funding=100, figsize=(8, 2)):
 
-    jsons = [json.load(open(f))
-             for f in glob(os.path.join(experiment_dir, '*.json'))]
-
-    def _get_amount(json_):
-        return json_['metadata']['parameters']['awardAmount']
+    jsons = _get_jsons(experiment_dir)
 
     fpr_dict = {
         (_get_amount(j), j['metadata']['policy']):
@@ -113,11 +119,72 @@ def plot_award_experiment(experiment_dir='awardAmounts', save_path=None,
 
         ax.set_ylim(0.0, 1.0)
         ax.set_xticklabels(
-                ['{:1.0e}'.format(el) for idx, el in enumerate(ax.get_xticks())],
-                # rotation=30
+                ['{:1.0e}'.format(el)
+                 for idx, el in enumerate(ax.get_xticks())]
             )
 
     if save_path is not None:
         plt.savefig(save_path)
 
     return jsons, fpr_dict
+
+
+def alpha_v_G(experiment_dir='fundingExperiment', save_path=None,
+              low_funding=35, high_funding=105, figsize=(4, 6)):
+
+    sync_file = '.alpha_v_G_sync.pickle'
+
+    if os.path.exists(sync_file):
+        print(
+            "Loading mean and stddev dictionaries from " + sync_file
+        )
+        with open(sync_file, 'rb') as sf:
+            fpr_mean_dict, fpr_stddev_dict = pickle.load(sf)
+
+    else:
+        print(
+            "Creating mean and stddev dictionaries, saving to " + sync_file
+        )
+        jsons = _get_jsons(experiment_dir)
+        fpr_mean_dict = {
+            _get_amount(j):
+            np.mean(j['falsePositiveRate'], axis=0)[-1]
+            for j in jsons
+            if (j['metadata']['policy'] == 'FPR')
+        }
+
+        fpr_stddev_dict = {
+            _get_amount(j):
+            np.std(j['falsePositiveRate'], axis=0)[-1]
+            for j in jsons
+            if (j['metadata']['policy'] == 'FPR')
+        }
+
+        with open(sync_file, 'wb') as sf:
+            pickle.dump([fpr_mean_dict, fpr_stddev_dict], sf)
+
+    amounts = list(fpr_mean_dict.keys())
+    amounts.sort()
+    amounts = [
+        el for el in amounts
+        if low_funding <= el and el <= high_funding
+    ]
+
+    means = [fpr_mean_dict[amount] for amount in amounts]
+    stddevs = [fpr_stddev_dict[amount] for amount in amounts]
+
+    # plt.plot(amounts, means, 'o', color='black')
+
+    plt.figure()
+
+    plt.errorbar(amounts, means, yerr=stddevs, color='black', marker='o')
+
+    plt.yticks(np.arange(0, 1.1, 0.25))
+
+    plt.xlabel(r'$G$', size=15)
+    plt.ylabel(r'$\alpha^*$', size=15, rotation=0)
+    plt.gca().yaxis.set_label_coords(-0.15, 0.5)
+    plt.gca().grid(axis='both')
+
+    if save_path:
+        plt.savefig(save_path)
