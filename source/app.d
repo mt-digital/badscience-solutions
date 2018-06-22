@@ -6,6 +6,7 @@ import std.container.slist;
 import std.conv;
 import std.getopt;
 import std.json;
+import std.math: approxEqual;
 import std.parallelism;
 import std.path;
 import std.random: randomSample;
@@ -252,7 +253,7 @@ class PI {
 unittest {
 
     PI pi = new PI();
-    assert(pi.detectionRate == 0.095, pi.detectionRate.to!string);
+    assert(pi.detectionRate.approxEqual(0.125));
 
     // Set up PI with enough funds to do 100 rounds of research.
     pi.funds = 100;
@@ -357,6 +358,52 @@ private void evolve(
         resetPI, mutateFprNowRange, fprMutationAmountRange, fprMutationRate
     );
 }
+unittest
+{
+    PI[] pis;
+    foreach (i; 0..10)
+    {
+        pis ~= new PI();
+        pis[i].age = i;
+        pis[i].publications = (10 - i);
+        pis[i].falsePositiveRate = 0.1;
+    }
+    pis[0].falsePositiveRate = 0.314159;
+
+    double fprMutationMagnitude = 0.01;
+    auto fprMutationAmountRange = 
+        normalVar(0.0, fprMutationMagnitude).range;
+
+    auto mutateFprNowRange = uniformVar(0.0, 1.0).range;
+    double awardAmount = 1.0;
+    double fprMutationRate = 0.0;
+    pis.evolve(
+        mutateFprNowRange, fprMutationAmountRange, awardAmount, 
+        fprMutationRate
+    );
+    mutateFprNowRange.popFront();
+    fprMutationAmountRange.popFront();
+
+    // The oldest of the ten PIs should die and inherit the FPR of the
+    // PI with the most publications.
+    assert(pis[$-1].age == 0);
+    assert(pis[$-1].falsePositiveRate == 0.314159);
+
+    fprMutationRate = 0.9;
+    foreach (pi; pis)
+        pi.falsePositiveRate = 0.1;
+
+    foreach (i; 0..5)
+    {
+        pis.evolve(
+            mutateFprNowRange, fprMutationAmountRange, awardAmount, 
+            fprMutationRate
+        );
+        mutateFprNowRange.popFront();
+        fprMutationAmountRange.popFront();
+    }
+    assert(pis.map!"a.falsePositiveRate".sum != 1.0);
+}
 
 
 // TODO make this a PI method.
@@ -368,25 +415,25 @@ private void reproduce(
         double fprMutationRate
     )
 {
-    double mutateAmt;
+    double mutateAmt = 0.0;
     bool mutate = mutateFprNowRange.front < fprMutationRate;
     
     if (mutate) 
     {
         // Get mutation amount and generate a new random FPR mutation value.
         mutateAmt = fprMutationAmountRange.front;
+    }
 
-        // Set FPR of the reset PI as the reproducing PI's FPR plus mutation.
-        resetPI.falsePositiveRate = 
-            piToReproduce.falsePositiveRate + mutateAmt;
-        if (resetPI.falsePositiveRate > 1.0)
-        {
-            resetPI.falsePositiveRate = 1.0;
-        }
-        else if (resetPI.falsePositiveRate < 0.0)
-        {
-            resetPI.falsePositiveRate = 0.0;
-        }
+    // Set FPR of the reset PI as the reproducing PI's FPR plus mutation.
+    resetPI.falsePositiveRate = piToReproduce.falsePositiveRate + mutateAmt;
+
+    if (resetPI.falsePositiveRate > 1.0)
+    {
+        resetPI.falsePositiveRate = 1.0;
+    }
+    else if (resetPI.falsePositiveRate < 0.0)
+    {
+        resetPI.falsePositiveRate = 0.0;
     }
 }
 

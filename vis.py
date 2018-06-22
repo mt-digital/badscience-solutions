@@ -121,6 +121,7 @@ def pub_plot_award_experiment(experiment_dir='../fundingExperiment',
         ax.set_xticklabels(ax.get_xticklabels(), size=lab_size - 3)
         ax.grid(axis='both')
         ax.set_xlim(0.0, 1e6)
+        ax.set_ylim(-0.05, 1.05)
         ax.set_xticks([0.0, 5e5, 1e6])
         ax.set_xticklabels(['0', r'$5 \times 10^5$', r'$10^6$'], size=lab_size - 3)
 
