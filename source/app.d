@@ -41,7 +41,7 @@ int main (string[] args) {
     double publishNegativeResultRate = 0.0;
     double falsePostivePaperDiscoveryRate = 0.0;
     double grantApplicationCost = 0.0;
-    AwardPolicy policy = AwardPolicy.PUBLICATIONS;
+    AwardPolicy policy = AwardPolicy.FPR;
 
     auto helpInformation = getopt(
         args,
@@ -189,8 +189,8 @@ private void doScience(PI[] pis)
 
 /****************** PRINCIPAL INVESTIGATOR *******************/
 const static double SCIENCE_COST = 1.0;
-const static double INIT_FUNDS = 20.0;
-const double INIT_POWER = 0.5;
+const static double INIT_FUNDS = 10.0;
+const double INIT_POWER = 0.8;
 const double BASE_RATE = 0.1;
 const static double INIT_FALSE_POS_RATE = 0.05;
 class PI {
