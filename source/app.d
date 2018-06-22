@@ -20,7 +20,7 @@ import mir.random.variable;
 import mir.math.common: fabs;
 import mir.random.algorithm: range, RandomRange, sample;
 
-import vibe.d;
+import vibe.d: serializeToJsonString;
 
 
 alias RandomRange!(threadLocal!Random, UniformVariable!double) UniformRange;
@@ -29,14 +29,18 @@ alias RandomRange!(threadLocal!Random, NormalVariable!double) NormalRange;
 
 const size_t N_TRIALS = 20;
 int main (string[] args) {
-    
+
     size_t N_ITER = 1e6.to!size_t;
     size_t nTrials = 10;
     double awardAmount = 50.0;
+    double seedFunding = 10.0;
     double baseRate = 0.1;
     double fprMutationRate = 0.25;
     double fprMutationMagnitude = 0.01;
-    double initialFalsePositiveRate = 0.5;
+    double initialFalsePositiveRate = 0.05;
+    double publishNegativeResultRate = 0.0;
+    double falsePostivePaperDiscoveryRate = 0.0;
+    double grantApplicationCost = 0.0;
     AwardPolicy policy = AwardPolicy.PUBLICATIONS;
 
     auto helpInformation = getopt(
@@ -48,7 +52,7 @@ int main (string[] args) {
             &baseRate,
         "awardAmount", "Amount given to grant-winning lab in a timestep (default 50)", 
             &awardAmount,
-        "initialFalsePositiveRate", "False positive rate of all PIs at t=0", 
+        "initialFalsePositiveRate", "False positive rate of all PIs at t=0 (default 0.05)", 
             &initialFalsePositiveRate,
         "fprMutationRate", "How often the false positive rate mutates (default 0.25)", 
             &fprMutationRate,
@@ -112,8 +116,6 @@ int main (string[] args) {
         );
 
     return 0;
-    /****** RUN ONE ******/
-    /* simulation("test.json"); */
 }
 
 
@@ -189,8 +191,8 @@ private void doScience(PI[] pis)
 const static double SCIENCE_COST = 1.0;
 const static double INIT_FUNDS = 20.0;
 const double INIT_POWER = 0.5;
-const double BASE_RATE = 0.5;
-const static double INIT_FALSE_POS_RATE = 0.1;
+const double BASE_RATE = 0.1;
+const static double INIT_FALSE_POS_RATE = 0.05;
 class PI {
     double funds = INIT_FUNDS;
     double power = INIT_POWER;
@@ -214,13 +216,20 @@ class PI {
     {
         if (this.funds > SCIENCE_COST) 
         {
+            bool publishNegativeResult = false;
             this.funds -= SCIENCE_COST;
             if (positiveResult()) 
             {
+                // TODO: if it's a false positive, have it be dected with r_d
+                // and do not publish
+                this.publications += 1;
+            }
+            else if (publishNegativeResult) { 
                 this.publications += 1;
             }
         }
         ++age;
+        this.uniformRange.popFront();
     }
 
     void reset()
@@ -241,8 +250,24 @@ class PI {
         }
 }
 unittest {
+
     PI pi = new PI();
-    assert (pi.detectionRate == 0.25 + 0.3);
+    assert(pi.detectionRate == 0.095, pi.detectionRate.to!string);
+
+    // Set up PI with enough funds to do 100 rounds of research.
+    pi.funds = 100;
+    foreach (_; 0..100)
+    {
+        pi.doScience();
+    }
+    // Statistically this should be true almost all the time.
+    assert(pi.publications > 5, pi.publications.to!string);
+    assert(pi.age == 100);
+
+    pi.reset();
+    assert(pi.publications == 0);
+    assert(pi.age == 0);
+    assert(pi.funds == INIT_FUNDS);
 }
 
 
@@ -251,7 +276,9 @@ enum AwardPolicy {RANDOM, PUBLICATIONS, FPR};
 
 
 const static size_t N_APPLICANTS = 10;
-private void applyForGrants(PI[] pis, double awardAmount, AwardPolicy policy=AwardPolicy.RANDOM) 
+private void applyForGrants(PI[] pis, double awardAmount, 
+                            AwardPolicy policy=AwardPolicy.RANDOM,
+                            double epsilon=0.1) 
 {
     auto applicants = randomSample(pis, N_APPLICANTS);
     final switch (policy) 
@@ -278,8 +305,27 @@ private void applyForGrants(PI[] pis, double awardAmount, AwardPolicy policy=Awa
             break;
     }
 }
+unittest 
+{
+    PI[] pis;
+    foreach (i; 0..10)
+    {
+        pis ~= new PI();
+        pis[i].publications = i;
+        pis[i].falsePositiveRate = (i + 1) * .05;
+    }
+
+    pis.applyForGrants(10.0, AwardPolicy.PUBLICATIONS);
+    pis.applyForGrants(10.0, AwardPolicy.FPR);
+    double fprMinFunds = pis[0].funds;
+    assert(fprMinFunds == INIT_FUNDS + 10.0);
+
+    double pubMaxFunds = pis[$-1].funds;
+    assert(pubMaxFunds == INIT_FUNDS + 10.0);
+}
 
 
+// TODO make PI method.
 private void addFunds(PI pi, double amount)
 {
     pi.funds += amount;
@@ -313,6 +359,7 @@ private void evolve(
 }
 
 
+// TODO make this a PI method.
 private void reproduce(
         PI piToReproduce, 
         PI resetPI, 
