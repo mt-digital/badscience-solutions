@@ -9,8 +9,9 @@
 #
 
 
+    # for awardAmount in `seq 1 20` 15 `seq 25 5 150`; do # 40 x 3 = 120 total
 for policy in RANDOM PUBLICATIONS FPR; do
-    for awardAmount in `seq 1 20` 15 `seq 25 5 150`; do # 40 x 3 = 120 total
+    for awardAmount in 62.5 67.5; do # 40 x 3 = 120 total
 
         echo "Running policy=$policy and awardAmount=$awardAmount"
 
