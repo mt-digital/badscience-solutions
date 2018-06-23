@@ -240,7 +240,8 @@ def alpha_v_G(experiment_dir='fundingExperiment', save_path=None,
 
     plt.figure()
 
-    plt.errorbar(amounts, means, yerr=stddevs, color='black', marker='o')
+    plt.errorbar(amounts, means, yerr=stddevs, color='black', marker='o',
+                 elinewidth=0.5)
 
     plt.yticks(np.arange(0, 1.1, 0.25))
 
@@ -286,7 +287,7 @@ def pubs_v_fpr(experiment_dir='../fundingExperiment',
         d = fpr_dict[amount]
         # ax.plot(d['fpr'][:, -1], d['pubs'][:, -1], 'o')
         plt.plot(d['fpr'][:, -1], d['pubs'][:, -1], 'o',
-                 label=r'$G={}$'.format(amount), alpha=0.6)
+                 label=r'$G={}$'.format(amount), alpha=0.5)
         # ax.set_title(r'$G={}$'.format(amount))
     plt.legend(fontsize=10, ncol=2)
     plt.xlabel(r'False positive rate at $t=T$', size=14)
