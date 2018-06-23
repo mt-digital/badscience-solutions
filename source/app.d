@@ -58,6 +58,8 @@ int main (string[] args) {
         "fprMutationRate", "How often the false positive rate mutates (default 0.25)", 
             &fprMutationRate,
         "fprMutationMagnitude", "Std. dev. of the false positive mutations (default 0.01)",
+            &publishNegativeResultRate,
+        "publishNegativeResultRate", "Rate that negative results are published (default 0.0)",
             &fprMutationMagnitude,
         "policy", "One of: RANDOM, PUBLICATIONS, FPR (default PUBLICATIONS)", 
             &policy
@@ -89,7 +91,8 @@ int main (string[] args) {
         "fprMutationMagnitude": fprMutationMagnitude,
         "awardAmount": awardAmount,
         "nTrials": nTrials,
-        "nIterations": N_ITER
+        "nIterations": N_ITER,
+        "publishNegativeResultRate": publishNegativeResultRate
     ];
 
     data.funds.length = nTrials;
@@ -102,7 +105,7 @@ int main (string[] args) {
 
         TimeseriesData thisTrialData = simulation(
             policy, awardAmount, baseRate, initialFalsePositiveRate,
-            fprMutationRate, fprMutationMagnitude, trialIdx
+            fprMutationRate, fprMutationMagnitude, publishNegativeResultRate
         );
 
         data.funds[trialIdx] = thisTrialData.funds;
@@ -127,7 +130,7 @@ size_t SYNC_EVERY = 2000;
 TimeseriesData simulation(AwardPolicy policy,
                 double awardAmount, double baseRate, 
                 double initialFalsePositiveRate, double fprMutationRate, 
-                double fprMutationMagnitude, size_t trialIdx) 
+                double fprMutationMagnitude, double publishNegativeResultRate) 
 {
     PI[] pis; 
 
@@ -141,6 +144,7 @@ TimeseriesData simulation(AwardPolicy policy,
         pis ~= new PI();
         pis[i].funds = awardAmount;
         pis[i].falsePositiveRate = initialFalsePositiveRate;
+        pis[i].publishNegativeResultRate = publishNegativeResultRate;
     }
 
     TimeseriesData data;
@@ -214,40 +218,44 @@ class PI {
     }
 
     public:
-    void doScience()
-    {
-        if (this.funds >= SCIENCE_COST) 
+        void doScience()
         {
-            this.funds -= SCIENCE_COST;
-            if (positiveResult()) 
+            if (this.funds >= SCIENCE_COST) 
             {
-                // TODO: if it's a false positive, have it be dected with r_d
-                // and do not publish
-                this.publications += 1;
+                this.funds -= SCIENCE_COST;
+                if (positiveResult()) 
+                {
+                    // TODO: if it's a false positive, have it be dected with r_d
+                    // and do not publish
+                    this.publications += 1;
+                }
+                else if (publishNegativeResult()) 
+                { 
+                    this.publications += 1;
+                }
             }
-            else if (publishNegativeResult()) 
-            { 
-                this.publications += 1;
-            }
+            ++age;
         }
-        ++age;
-        this.uniformRange.popFront();
-    }
-
-    void reset()
-    {
-        this.funds = INIT_FUNDS;
-        this.publications = 0;
-        this.age = 0;
-    }
+        void reset()
+        {
+            this.funds = INIT_FUNDS;
+            this.publications = 0;
+            this.age = 0;
+        }
 
     private:
-        bool positiveResult() {
-            return this.uniformRange.front < this.detectionRate;
+        bool positiveResult() 
+        {
+            bool ret = this.uniformRange.front < this.detectionRate;
+            this.uniformRange.popFront();
+            return ret;
         }
 
-        bool publishNegativeResult() {
-            return this.uniformRange.front < this.publishNegativeResultRate;
+        bool publishNegativeResult() 
+        {
+            bool ret = this.uniformRange.front < this.publishNegativeResultRate;
+            this.uniformRange.popFront();
+            return ret;
         }
         // Rate of all detections: fn of base rate, power, and false pos rate.
         @property const double detectionRate() {
@@ -256,7 +264,6 @@ class PI {
         }
 }
 unittest {
-
     PI pi = new PI();
     assert(pi.detectionRate.approxEqual(0.125));
 

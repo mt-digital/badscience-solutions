@@ -132,7 +132,7 @@ def pub_plot_award_experiment(experiment_dir='../fundingExperiment',
 def plot_award_experiment_row(
             experiment_dir='fundingExperiment', jsons=None, save_path=None,
             fundings=None, low_funding=50, high_funding=100,
-            figsize=(8, 2), axes=None
+            figsize=(8, 2), axes=None, policy=None
         ):
 
     if jsons is None:
@@ -175,10 +175,19 @@ def plot_award_experiment_row(
     # Plot FPR timeseries for different values of G, G increases from left
     # to right. Each subplot has three lines, one for each award policy.
     for idx, amount in enumerate(amounts):
-        ax = axes[idx]
-        for p_idx, policy in enumerate(['RANDOM', 'PUBLICATIONS', 'FPR']):
-            ax.plot(t, fpr_dict[(amount, policy)], color=colors[p_idx],
-                    label=labels[p_idx])
+        try:
+            ax = axes[idx]
+        except:
+            ax = axes
+
+        if policy is not None:
+            ax.plot(t, fpr_dict[(amount, policy)], color='k',
+                    label=policy)
+
+        else:
+            for p_idx, policy in enumerate(['RANDOM', 'PUBLICATIONS', 'FPR']):
+                ax.plot(t, fpr_dict[(amount, policy)], color=colors[p_idx],
+                        label=labels[p_idx])
 
         ax.set_title(r'$G={}$'.format(amount))
 
