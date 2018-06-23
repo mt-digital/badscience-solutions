@@ -6,7 +6,7 @@ import std.container.slist;
 import std.conv;
 import std.getopt;
 import std.json;
-import std.math: approxEqual;
+import std.math: abs, approxEqual;
 import std.parallelism;
 import std.path;
 import std.random: randomSample;
@@ -198,6 +198,7 @@ class PI {
     double funds = INIT_FUNDS;
     double power = INIT_POWER;
     double falsePositiveRate = INIT_FALSE_POS_RATE;
+    double publishNegativeResultRate = 0.0;
     size_t publications = 0;
     size_t age = 0;
     UniformRange uniformRange;
@@ -215,9 +216,8 @@ class PI {
     public:
     void doScience()
     {
-        if (this.funds > SCIENCE_COST) 
+        if (this.funds >= SCIENCE_COST) 
         {
-            bool publishNegativeResult = false;
             this.funds -= SCIENCE_COST;
             if (positiveResult()) 
             {
@@ -225,7 +225,8 @@ class PI {
                 // and do not publish
                 this.publications += 1;
             }
-            else if (publishNegativeResult) { 
+            else if (publishNegativeResult()) 
+            { 
                 this.publications += 1;
             }
         }
@@ -243,6 +244,10 @@ class PI {
     private:
         bool positiveResult() {
             return this.uniformRange.front < this.detectionRate;
+        }
+
+        bool publishNegativeResult() {
+            return this.uniformRange.front < this.publishNegativeResultRate;
         }
         // Rate of all detections: fn of base rate, power, and false pos rate.
         @property const double detectionRate() {
@@ -264,11 +269,25 @@ unittest {
     // Statistically this should be true almost all the time.
     assert(pi.publications > 5, pi.publications.to!string);
     assert(pi.age == 100);
+    assert(pi.funds == 0, pi.funds.to!string);
 
     pi.reset();
     assert(pi.publications == 0);
     assert(pi.age == 0);
     assert(pi.funds == INIT_FUNDS);
+
+    // Now test publishing negative results.
+    // Make it impossible for the PI to publish positive results and count
+    // negative results.
+    pi.power = 0.0;
+    pi.falsePositiveRate = 0.0;
+    pi.publishNegativeResultRate = 0.5;
+    pi.funds = 1000;
+    foreach (_; 1000.iota)
+    {
+        pi.doScience(); 
+    }
+    assert(abs(pi.publications - 500.0) < 50.0, pi.publications.to!string);
 }
 
 
