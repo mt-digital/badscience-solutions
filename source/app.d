@@ -57,9 +57,9 @@ int main (string[] args) {
             &initialFalsePositiveRate,
         "fprMutationRate", "How often the false positive rate mutates (default 0.25)", 
             &fprMutationRate,
-        "fprMutationMagnitude", "Std. dev. of the false positive mutations (default 0.01)",
-            &publishNegativeResultRate,
         "publishNegativeResultRate", "Rate that negative results are published (default 0.0)",
+            &publishNegativeResultRate,
+        "fprMutationMagnitude", "Std. dev. of the false positive mutations (default 0.01)",
             &fprMutationMagnitude,
         "policy", "One of: RANDOM, PUBLICATIONS, FPR (default PUBLICATIONS)", 
             &policy
@@ -273,6 +273,7 @@ unittest {
     {
         pi.doScience();
     }
+
     // Statistically this should be true almost all the time.
     assert(pi.publications > 5, pi.publications.to!string);
     assert(pi.age == 100);

@@ -263,6 +263,55 @@ def alpha_v_G(experiment_dir='fundingExperiment', save_path=None,
         plt.savefig(save_path)
 
 
+def alpha_v_g_over_negrespub(
+        experiment_dir='negativeResults/', save_path=None, low_funding=1,
+        high_funding=105, figsize=(4, 6), negres_rates=[0.0, 0.1, 0.2, 0.5]
+        ):
+    # sync_file = '.alpha_over_negrespub'
+
+    # Need to make one plot for each neg result rate.
+    jsons = _get_jsons(experiment_dir)
+
+    def _get_pubneg(j):
+        return j['metadata']['parameters']['publishNegativeResultRate']
+
+    styles = ['-', ':', '-.', '--']
+    for idx, negres_rate in enumerate(negres_rates):
+        print(negres_rate)
+        print(_get_pubneg(jsons[0]))
+        print(_get_pubneg(jsons[0]) in negres_rates)
+        fpr_mean_dict = {
+            _get_amount(j):
+            np.mean(j['falsePositiveRate'], axis=0)[-1]
+            for j in jsons
+            if (_get_pubneg(j) in negres_rates)
+        }
+
+        fpr_stddev_dict = {
+            _get_amount(j):
+            np.std(j['falsePositiveRate'], axis=0)[-1]
+            for j in jsons
+            if (_get_pubneg(j) in negres_rates)
+        }
+
+        amounts = list(fpr_mean_dict.keys())
+        amounts.sort()
+        amounts = [
+            el for el in amounts
+            if low_funding <= el and el <= high_funding
+        ]
+
+        means = [fpr_mean_dict[amount] for amount in amounts]
+        stddevs = [fpr_stddev_dict[amount] for amount in amounts]
+
+        # plt.plot(amounts, means, 'o', color='black')
+
+        plt.figure()
+
+        plt.errorbar(amounts, means, yerr=stddevs, color='black', marker='o',
+                     elinewidth=0.5, ls=styles[idx])
+
+
 def pubs_v_fpr(experiment_dir='../fundingExperiment',
                                   save_path=None, fundings=[10, 20, 50, 80, 90, 105],
                                   figsize=(6, 4)):
