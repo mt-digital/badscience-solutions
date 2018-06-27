@@ -39,7 +39,7 @@ int main (string[] args) {
     double fprMutationMagnitude = 0.01;
     double initialFalsePositiveRate = 0.05;
     double publishNegativeResultRate = 0.0;
-    double falsePostivePaperDiscoveryRate = 0.0;
+    double falsePositiveDetectionRate = 0.0;
     double grantApplicationCost = 0.0;
     AwardPolicy policy = AwardPolicy.FPR;
 
@@ -60,6 +60,8 @@ int main (string[] args) {
             &publishNegativeResultRate,
         "fprMutationMagnitude", "Std. dev. of the false positive mutations (default 0.01)",
             &fprMutationMagnitude,
+        "falsePositiveDetectionRate", "Std. dev. of the false positive mutations (default 0.01)",
+            &falsePositiveDetectionRate,
         "policy", "One of: RANDOM, PUBLICATIONS, FPR (default PUBLICATIONS)", 
             &policy
     );
@@ -104,7 +106,8 @@ int main (string[] args) {
 
         TimeseriesData thisTrialData = simulation(
             policy, awardAmount, baseRate, initialFalsePositiveRate,
-            fprMutationRate, fprMutationMagnitude, publishNegativeResultRate
+            fprMutationRate, fprMutationMagnitude, publishNegativeResultRate,
+            falsePositiveDetectionRate
         );
 
         data.funds[trialIdx] = thisTrialData.funds;
@@ -129,7 +132,8 @@ size_t SYNC_EVERY = 2000;
 TimeseriesData simulation(AwardPolicy policy,
                 double awardAmount, double baseRate, 
                 double initialFalsePositiveRate, double fprMutationRate, 
-                double fprMutationMagnitude, double publishNegativeResultRate) 
+                double fprMutationMagnitude, double publishNegativeResultRate,
+                double falsePositiveDetectionRate) 
 {
     PI[] pis; 
 
@@ -154,7 +158,7 @@ TimeseriesData simulation(AwardPolicy policy,
     foreach (iter; 0..N_ITER)
     {
         // PI's try to do research and publish it.
-        pis.doScience;
+        pis.doScience(falsePositiveDetectionRate);
              
         // Agency reviews "grant applications".
         pis.applyForGrants(awardAmount, policy);
@@ -184,10 +188,10 @@ TimeseriesData simulation(AwardPolicy policy,
 }
 
 
-private void doScience(PI[] pis) 
+private void doScience(PI[] pis, double falsePositiveDetectionRate) 
 {
     foreach (pi; pis)
-        pi.doScience();
+        pi.doScience(falsePositiveDetectionRate);
 }
 
 
