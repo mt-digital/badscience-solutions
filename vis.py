@@ -262,7 +262,7 @@ def alpha_v_G(experiment_dir='fundingExperiment', save_path=None,
     if save_path:
         plt.savefig(save_path)
 
-def _is_policy(j):
+def _is_policy(j, policy):
     return policy == j['metadata']['policy']
 
 
@@ -293,14 +293,14 @@ def alpha_v_g_over_negrespub(
             _get_amount(j):
             np.mean(j['falsePositiveRate'], axis=0)[-1]
             for j in jsons
-            if (_is_negres_rate(j, negres_rate) and _is_policy(j))
+            if (_is_negres_rate(j, negres_rate) and _is_policy(j, policy))
         }
 
         fpr_stddev_dict = {
             _get_amount(j):
             np.std(j['falsePositiveRate'], axis=0)[-1]
             for j in jsons
-            if (_is_negres_rate(j, negres_rate) and _is_policy(j))
+            if (_is_negres_rate(j, negres_rate) and _is_policy(j, policy))
         }
 
         amounts = list(fpr_mean_dict.keys())
@@ -340,9 +340,9 @@ def alpha_v_g_over_negrespub(
 
 def peer_review(
             experiment_dir='../data/peer-review', save_path=None,
-            figsize=(4, 6), falsepos_detect_rates=[0.25, 0.5, 0.75, 1.0]
+            figsize=(10, 7.5), falsepos_detect_rates=[0.25, 0.5, 0.75, 1.0]
         ):
-    fig, ax = plt.subplots(ncols=2, sharey=True)
+    fig, axes = plt.subplots(nrows=2, sharex=True, figsize=figsize)
 
     jsons = _get_jsons(experiment_dir)
 
@@ -353,20 +353,21 @@ def peer_review(
 
     styles = ['-', ':', '-.', '--']
     colors = ['blue', 'red']
-    for policy in ['PUBLICATIONS', 'RANDOM']:
-        for idx, fpdr in falsepos_detect_rates:
+    titles = ['Most-publications allocation', 'Random allocation']
+    for policy_idx, policy in enumerate(['PUBLICATIONS', 'RANDOM']):
+        for fpdr_idx, fpdr in enumerate(falsepos_detect_rates):
             fpr_mean_dict = {
                 _get_amount(j):
                 np.mean(j['falsePositiveRate'], axis=0)[-1]
                 for j in jsons
-                if (_is_fpdr(j, fpdr) and _is_policy(j))
+                if (_is_fpdr(j, fpdr) and _is_policy(j, policy))
             }
 
             fpr_stddev_dict = {
                 _get_amount(j):
                 np.std(j['falsePositiveRate'], axis=0)[-1]
                 for j in jsons
-                if (_is_fpdr(j, fpdr) and _is_policy(j))
+                if (_is_fpdr(j, fpdr) and _is_policy(j, policy))
             }
 
             amounts = list(fpr_mean_dict.keys())
@@ -379,10 +380,23 @@ def peer_review(
             means = [fpr_mean_dict[amount] for amount in amounts]
             stddevs = [fpr_stddev_dict[amount] for amount in amounts]
 
-            plt.errorbar(amounts, means, yerr=stddevs,
-                         color=colors[idx], marker='o',
-                         ms=2, elinewidth=0.5, ls=styles[idx],
-                         label='False Pos. Detect. Rate={:.2f}'.format(fpdr))
+            axes[policy_idx].errorbar(
+                amounts, means, yerr=stddevs, color=colors[policy_idx],
+                marker='o', ms=2, elinewidth=0.5, ls=styles[fpdr_idx],
+                label='fpdr={:.2f}'.format(fpdr)
+            )
+
+        axes[policy_idx].legend(fontsize=10)
+
+        axes[policy_idx].set_ylabel('False positive rate', fontsize=14)
+        axes[policy_idx].set_title(titles[policy_idx], fontsize=14)
+
+        axes[policy_idx].set_yticks(np.arange(0.0, 1.01, 0.25))
+        axes[policy_idx].grid(axis='both')
+
+    axes[1].set_xlabel('Award amount', fontsize=14)
+    if save_path is not None:
+        plt.savefig(save_path)
 
 
 def pubs_v_fpr(experiment_dir='../fundingExperiment',
