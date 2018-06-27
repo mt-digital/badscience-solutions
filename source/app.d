@@ -224,35 +224,36 @@ class PI {
     public:
         void doScience(double falsePositiveDetectionRate=0.0)
         {
-            if (this.funds >= SCIENCE_COST) 
+            if (this.funds >= SCIENCE_COST)
             {
                 this.funds -= SCIENCE_COST;
-                if (positiveResult()) 
+                if (hypothesisTrue())
                 {
-                    bool falsePositive = falsePositiveResult();
-                    if (!falsePositive)
+                    if (foundPositiveGivenTrue())
                     {
                         this.publications += 1;
                     }
-                    else
+                    else if (publishNegativeResult())
                     {
-                        bool detected = 
-                            this.uniformRange.front 
-                            < falsePositiveDetectionRate;
-                        this.uniformRange.popFront();
-                        if (!detected)
-                        {
-                            this.publications += 1;
-                        }
+                        this.publications += 1;
                     }
                 }
-                else if (publishNegativeResult()) 
-                { 
-                    this.publications += 1;
+                else
+                {
+                    if (foundPositiveGivenFalse() && 
+                        !falsePositiveDetected(falsePositiveDetectionRate))
+                    {
+                        this.publications += 1;
+                    }
+                    else if (publishNegativeResult())
+                    {
+                        this.publications += 1;
+                    }
                 }
             }
             ++age;
         }
+
         void reset()
         {
             this.funds = INIT_FUNDS;
@@ -261,22 +262,24 @@ class PI {
         }
 
     private:
-        bool positiveResult() 
+        bool foundPositiveGivenTrue() 
         {
-            bool ret = this.uniformRange.front < this.detectionRate;
+            bool ret = this.uniformRange.front < this.power;
             this.uniformRange.popFront();
             return ret;
         }
-        bool falsePositiveResult()
+
+        bool foundPositiveGivenFalse()
         {
-            double denom = 1.0 + 
-                ( 
-                    (this.power * BASE_RATE)/
-                    ((1 - BASE_RATE) * this.falsePositiveRate) 
-                )
-            ;
-            double conditionalFalseRate = 1.0 / denom;
-            bool ret = this.uniformRange.front < conditionalFalseRate;
+            bool ret = this.uniformRange.front < this.falsePositiveRate;
+            this.uniformRange.popFront();
+            return ret;
+        }
+
+        bool falsePositiveDetected(double falsePositiveDetectionRate)
+        {
+
+            bool ret = this.uniformRange.front < falsePositiveDetectionRate;
             this.uniformRange.popFront();
             return ret;
         }
@@ -288,15 +291,15 @@ class PI {
             return ret;
         }
 
-        // Rate of all detections: fn of base rate, power, and false pos rate.
-        @property const double detectionRate() {
-            return (BASE_RATE * this.power) + 
-                   ((1 - BASE_RATE) * this.falsePositiveRate);
+        bool hypothesisTrue()
+        {
+            bool ret = this.uniformRange.front < BASE_RATE;
+            this.uniformRange.popFront();
+            return ret;
         }
 }
 unittest {
     PI pi = new PI();
-    assert(pi.detectionRate.approxEqual(0.125));
 
     // Set up PI with enough funds to do 100 rounds of research.
     pi.funds = 100;
