@@ -262,6 +262,9 @@ def alpha_v_G(experiment_dir='fundingExperiment', save_path=None,
     if save_path:
         plt.savefig(save_path)
 
+def _is_policy(j):
+    return policy == j['metadata']['policy']
+
 
 def alpha_v_g_over_negrespub(
         experiment_dir='negativeResults/', save_path=None, low_funding=1,
@@ -277,9 +280,6 @@ def alpha_v_g_over_negrespub(
     def _is_negres_rate(j, negres_rate):
         return (negres_rate ==
                 j['metadata']['parameters']['publishNegativeResultRate'])
-
-    def _is_policy(j):
-        return policy == j['metadata']['policy']
 
     plot_colors = {
         'RANDOM': 'red',
@@ -338,6 +338,53 @@ def alpha_v_g_over_negrespub(
         plt.savefig(save_path)
 
 
+def peer_review(
+            experiment_dir='../data/peer-review', save_path=None,
+            figsize=(4, 6), falsepos_detect_rates=[0.25, 0.5, 0.75, 1.0]
+        ):
+    fig, ax = plt.subplots(ncols=2, sharey=True)
+
+    jsons = _get_jsons(experiment_dir)
+
+    # false positive detection rate (fpdr)
+    def _is_fpdr(j, fpdr):
+        return (fpdr ==
+                j['metadata']['parameters']['falsePositiveDetectionRate'])
+
+    styles = ['-', ':', '-.', '--']
+    colors = ['blue', 'red']
+    for policy in ['PUBLICATIONS', 'RANDOM']:
+        for idx, fpdr in falsepos_detect_rates:
+            fpr_mean_dict = {
+                _get_amount(j):
+                np.mean(j['falsePositiveRate'], axis=0)[-1]
+                for j in jsons
+                if (_is_fpdr(j, fpdr) and _is_policy(j))
+            }
+
+            fpr_stddev_dict = {
+                _get_amount(j):
+                np.std(j['falsePositiveRate'], axis=0)[-1]
+                for j in jsons
+                if (_is_fpdr(j, fpdr) and _is_policy(j))
+            }
+
+            amounts = list(fpr_mean_dict.keys())
+            amounts.sort()
+            amounts = [
+                el for el in amounts
+                # if low_funding <= el and el <= high_funding
+            ]
+
+            means = [fpr_mean_dict[amount] for amount in amounts]
+            stddevs = [fpr_stddev_dict[amount] for amount in amounts]
+
+            plt.errorbar(amounts, means, yerr=stddevs,
+                         color=colors[idx], marker='o',
+                         ms=2, elinewidth=0.5, ls=styles[idx],
+                         label='False Pos. Detect. Rate={:.2f}'.format(fpdr))
+
+
 def pubs_v_fpr(experiment_dir='../fundingExperiment',
                save_path=None, fundings=[10, 20, 50, 80, 90, 105],
                figsize=(6, 4)):
@@ -364,7 +411,6 @@ def pubs_v_fpr(experiment_dir='../fundingExperiment',
         amount for amount in amounts
         if _funding_check(amount)
     ]
-    n_amounts = len(amounts)
 
     # for ax, amount in zip(axes, amounts):
     for amount in amounts:

@@ -93,7 +93,8 @@ int main (string[] args) {
         "awardAmount": awardAmount,
         "nTrials": nTrials,
         "nIterations": N_ITER,
-        "publishNegativeResultRate": publishNegativeResultRate
+        "publishNegativeResultRate": publishNegativeResultRate,
+        "falsePositiveDetectionRate": falsePositiveDetectionRate
     ];
 
     data.funds.length = nTrials;
