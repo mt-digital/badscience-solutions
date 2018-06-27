@@ -10,7 +10,7 @@ policy=$1
 awardAmount=$2
 publishNegativeResultRate=$3
 
-./scimod-agency /scratch/mturner8/scimod/negativeResults \
+./scimod-agency /scratch/mturner8/scimod/negativeResults-others-desiredRates/ \
     --fprMutationRate=0.025 \
     --fprMutationMagnitude=0.01 \
     --policy=$policy \
