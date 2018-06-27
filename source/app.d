@@ -13,7 +13,6 @@ import std.random: randomSample;
 import std.range;
 import std.stdio;
 import std.uuid;
-import std.zlib: compress;
 
 import mir.random;
 import mir.random.engine;
@@ -196,7 +195,7 @@ private void doScience(PI[] pis)
 const static double SCIENCE_COST = 1.0;
 const static double INIT_FUNDS = 10.0;
 const double INIT_POWER = 0.8;
-const double BASE_RATE = 0.1;
+double BASE_RATE = 0.1;
 const static double INIT_FALSE_POS_RATE = 0.05;
 class PI {
     double funds = INIT_FUNDS;
@@ -218,16 +217,29 @@ class PI {
     }
 
     public:
-        void doScience()
+        void doScience(double falsePositiveDetectionRate=0.0)
         {
             if (this.funds >= SCIENCE_COST) 
             {
                 this.funds -= SCIENCE_COST;
                 if (positiveResult()) 
                 {
-                    // TODO: if it's a false positive, have it be dected with r_d
-                    // and do not publish
-                    this.publications += 1;
+                    bool falsePositive = falsePositiveResult();
+                    if (!falsePositive)
+                    {
+                        this.publications += 1;
+                    }
+                    else
+                    {
+                        bool detected = 
+                            this.uniformRange.front 
+                            < falsePositiveDetectionRate;
+                        this.uniformRange.popFront();
+                        if (!detected)
+                        {
+                            this.publications += 1;
+                        }
+                    }
                 }
                 else if (publishNegativeResult()) 
                 { 
@@ -250,6 +262,19 @@ class PI {
             this.uniformRange.popFront();
             return ret;
         }
+        bool falsePositiveResult()
+        {
+            double denom = 1.0 + 
+                ( 
+                    (this.power * BASE_RATE)/
+                    ((1 - BASE_RATE) * this.falsePositiveRate) 
+                )
+            ;
+            double conditionalFalseRate = 1.0 / denom;
+            bool ret = this.uniformRange.front < conditionalFalseRate;
+            this.uniformRange.popFront();
+            return ret;
+        }
 
         bool publishNegativeResult() 
         {
@@ -257,6 +282,7 @@ class PI {
             this.uniformRange.popFront();
             return ret;
         }
+
         // Rate of all detections: fn of base rate, power, and false pos rate.
         @property const double detectionRate() {
             return (BASE_RATE * this.power) + 
@@ -296,6 +322,45 @@ unittest {
         pi.doScience(); 
     }
     assert(abs(pi.publications - 500.0) < 50.0, pi.publications.to!string);
+
+    // Now do science with peer review. Check that the number of publications
+    // is within a range for different false positive 
+    pi.reset();
+
+    pi.power = 0.0;
+    pi.publishNegativeResultRate = 0.0;
+    pi.funds = 1000;
+
+    // So every result is a false positive.
+    BASE_RATE = 0.0; 
+    pi.falsePositiveRate = 1.0;
+
+    .writeln;
+    foreach (fpDetectRate; [0.0, 0.2, 0.5, 0.8])
+    {
+        foreach (_; 1000.iota)
+        {
+            pi.doScience(fpDetectRate);
+        }
+        double expectedUpperLimit = 1000 - (1000*fpDetectRate) + (50 / (1 + fpDetectRate));
+        double expectedLowerLimit = 1000 - (1000*fpDetectRate) - (50 / (1 + fpDetectRate));
+        writefln(
+            "FP Detect Rate: %.2f\nUpper: %.2f\nLower: %.2f\nPubs: %d\n",
+            fpDetectRate, expectedUpperLimit, expectedLowerLimit, 
+            pi.publications 
+        );
+        if (fpDetectRate == 0.0)
+        {
+            assert(pi.publications == 1000);
+        }
+        else
+        {
+            assert(pi.publications < expectedUpperLimit);
+            assert(pi.publications > expectedLowerLimit);
+        }
+        pi.publications = 0;
+        pi.funds = 1000;
+    }
 }
 
 
