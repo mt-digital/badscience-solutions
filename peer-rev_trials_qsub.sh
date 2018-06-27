@@ -10,7 +10,7 @@ policy=$1
 awardAmount=$2
 falsePositiveDetectionRate=$3
 
-./scimod-agency /scratch/mturner8/scimod/peer-review/ \
+./scimod-agency /scratch/mturner8/scimod/peer-review-gte0p8/ \
     --fprMutationRate=0.025 \
     --fprMutationMagnitude=0.01 \
     --policy=$policy \
