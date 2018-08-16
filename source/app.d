@@ -81,7 +81,6 @@ int main (string[] args) {
     }
     string writeDir = args[1];
 
-    /****** RUN MANY IN PARALLEL ******/
     defaultPoolThreads(totalCPUs);
     TrialsData data;
     data.metadata.syncEvery = SYNC_EVERY;
@@ -101,6 +100,7 @@ int main (string[] args) {
     data.falsePositiveRate.length = nTrials;
     data.nPublications.length = nTrials;
 
+    /****** RUN TRIALS IN PARALLEL ******/
     foreach (trialIdx; parallel(nTrials.iota))
     {
         writefln("running %d of %d", trialIdx + 1, nTrials);

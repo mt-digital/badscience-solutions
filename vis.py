@@ -9,6 +9,7 @@ import pandas as pd
 import pickle
 
 from glob import glob
+from collections import Counter
 
 
 def plot_simple(dataPath):
@@ -95,6 +96,7 @@ def pub_plot_award_experiment(experiment_dir='../fundingExperiment',
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize,
                              sharex=True, sharey=True)
 
+    print(Counter([j['metadata']['policy'] for j in jsons]))
     for r_idx in range(nrows):
 
         from_ = (ncols * r_idx)
@@ -178,6 +180,7 @@ def plot_award_experiment_row(
         try:
             ax = axes[idx]
         except:
+            print("excepted")
             ax = axes
 
         if policy is not None:
@@ -186,7 +189,10 @@ def plot_award_experiment_row(
 
         else:
             for p_idx, policy in enumerate(['RANDOM', 'PUBLICATIONS', 'FPR']):
-                ax.plot(t, fpr_dict[(amount, policy)], color=colors[p_idx],
+                to_plot = fpr_dict[(amount, policy)]
+                print(to_plot.shape)
+                print((amount, policy))
+                ax.plot(t, to_plot, color=colors[p_idx],
                         label=labels[p_idx])
 
         ax.set_title(r'$G={}$'.format(amount))
