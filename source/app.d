@@ -143,6 +143,7 @@ TimeseriesData simulation(AwardPolicy policy,
 
     auto mutateFprNowRange = uniformVar(0.0, 1.0).range;
 
+    /* t=0; initialize first generation of PIs */
     foreach (i; 0..N_PI)
     {
         pis ~= new PI();
@@ -170,6 +171,7 @@ TimeseriesData simulation(AwardPolicy policy,
         mutateFprNowRange.popFront();
         fprMutationAmountRange.popFront();
 
+        /* Sync model data for this timestep */
         if (iter % SYNC_EVERY == 0) 
         {
             size_t syncIdx = iter / SYNC_EVERY;
@@ -226,13 +228,18 @@ class PI {
         {
             if (this.funds >= SCIENCE_COST)
             {
+                // Pay up.
                 this.funds -= SCIENCE_COST;
+                // The oracle says the hypothesis is True.
                 if (hypothesisTrue())
                 {
+                    // Uses true positive rate for this PI.
                     if (foundPositiveGivenTrue())
                     {
+                        // True positive results always published.
                         this.publications += 1;
                     }
+                    // PI found a false negative, since hypothesis is True.
                     else if (publishNegativeResult())
                     {
                         this.publications += 1;
@@ -240,11 +247,13 @@ class PI {
                 }
                 else
                 {
+                    // False positive not published if detected by peer review.
                     if (foundPositiveGivenFalse() && 
                         !falsePositiveDetected(falsePositiveDetectionRate))
                     {
                         this.publications += 1;
                     }
+                    // Negative result found. 
                     else if (publishNegativeResult())
                     {
                         this.publications += 1;
@@ -254,6 +263,10 @@ class PI {
             ++age;
         }
 
+        /**
+         * Use when killing an old and birthing a new PI instead of deleting
+         * and creating a new PI instance.
+         */
         void reset()
         {
             this.funds = INIT_FUNDS;
@@ -537,6 +550,8 @@ private void reproduce(
     }
 }
 
+
+/* SYNC DATA STRUCTURES */
 struct TrialsData
 {
     Metadata metadata;
