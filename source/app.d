@@ -4,6 +4,7 @@ import std.algorithm;
 import std.array;
 import std.container.slist;
 import std.conv;
+import std.exception;
 import std.getopt;
 import std.json;
 import std.math: abs, approxEqual;
@@ -41,6 +42,7 @@ int main (string[] args) {
     double publishNegativeResultRate = 0.0;
     double falsePositiveDetectionRate = 0.0;
     double grantApplicationCost = 0.0;
+    string paramsList = "";
     AwardPolicy policy = AwardPolicy.FPR;
 
     auto helpInformation = getopt(
@@ -48,6 +50,8 @@ int main (string[] args) {
         std.getopt.config.passThrough,
         "nTrials", "Number of trials to run (default 10)", 
             &nTrials,
+        "nIter", "Number of iterations",
+            &N_ITER,
         "baseRate", "Base rate of true hypotheses (default 0.1)", 
             &baseRate,
         "awardAmount", "Amount given to grant-winning lab in a timestep (default 50)", 
@@ -63,7 +67,9 @@ int main (string[] args) {
         "falsePositiveDetectionRate", "Std. dev. of the false positive mutations (default 0.01)",
             &falsePositiveDetectionRate,
         "policy", "One of: RANDOM, PUBLICATIONS, FPR (default PUBLICATIONS)", 
-            &policy
+            &policy,
+        "paramsList", "Comma-separated list of variable parameters, <POLICY>,<AWARD AMOUNT>,<PUB. NEG. RES. RATE>,<FALSE POS. DET. RATE>; e.g. \"FPR,5,0.5,0.9\"", 
+            &paramsList
     );
 
     if (helpInformation.helpWanted)
@@ -81,7 +87,23 @@ int main (string[] args) {
     }
     string writeDir = args[1];
 
+    // comma-separated `paramsList` overrides options if provided.
+    if (paramsList.length > 0) {
+
+        auto params = paramsList.split(",");
+
+        enforce(params.length == 4, 
+                "paramsList must have four comma-separated values");
+
+        policy = params[0].to!AwardPolicy;
+        awardAmount = params[1].to!double;
+        publishNegativeResultRate = params[2].to!double;
+        falsePositiveDetectionRate = params[3].to!double;
+    }
+
     defaultPoolThreads(totalCPUs);
+
+    /* Set up simulation data storage */
     TrialsData data;
     data.metadata.syncEvery = SYNC_EVERY;
     data.metadata.policy = policy.to!string;
@@ -108,7 +130,7 @@ int main (string[] args) {
         TimeseriesData thisTrialData = simulation(
             policy, awardAmount, baseRate, initialFalsePositiveRate,
             fprMutationRate, fprMutationMagnitude, publishNegativeResultRate,
-            falsePositiveDetectionRate
+            falsePositiveDetectionRate, N_ITER
         );
 
         data.funds[trialIdx] = thisTrialData.funds;
@@ -128,13 +150,13 @@ int main (string[] args) {
 
 
 const size_t N_PI = 100;
-size_t N_ITER = 1e6.to!size_t;
+/* size_t N_ITER = 1e6.to!size_t; */
 size_t SYNC_EVERY = 2000;
 TimeseriesData simulation(AwardPolicy policy,
                 double awardAmount, double baseRate, 
                 double initialFalsePositiveRate, double fprMutationRate, 
                 double fprMutationMagnitude, double publishNegativeResultRate,
-                double falsePositiveDetectionRate) 
+                double falsePositiveDetectionRate, size_t N_ITER) 
 {
     PI[] pis; 
 
@@ -151,7 +173,7 @@ TimeseriesData simulation(AwardPolicy policy,
         pis[i].falsePositiveRate = initialFalsePositiveRate;
         pis[i].publishNegativeResultRate = publishNegativeResultRate;
     }
-
+    
     TimeseriesData data;
     data.funds.length = N_ITER / SYNC_EVERY;
     data.falsePositiveRate.length = N_ITER / SYNC_EVERY;
