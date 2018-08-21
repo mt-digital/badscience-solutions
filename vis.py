@@ -84,7 +84,8 @@ def _get_amount(json_):
 
 
 def pub_plot_award_experiment(experiment_dir='../fundingExperiment',
-                              save_path=None, fundings=[], figsize=(7.5, 8.5)):
+                              save_path=None, fundings=[], figsize=(7.5, 8.5),
+                              n_iter=1e6):
 
     assert len(fundings) == 6
     # Subplots dimensions.
@@ -134,7 +135,7 @@ def pub_plot_award_experiment(experiment_dir='../fundingExperiment',
 def plot_award_experiment_row(
             experiment_dir='fundingExperiment', jsons=None, save_path=None,
             fundings=None, low_funding=50, high_funding=100,
-            figsize=(8, 2), axes=None, policy=None
+            figsize=(8, 2), axes=None, policy=None, n_iter=1e6
         ):
 
     if jsons is None:
@@ -170,7 +171,7 @@ def plot_award_experiment_row(
         _, axes = plt.subplots(nrows=1, ncols=n_amounts, figsize=figsize)
 
     # Ready plot parameters
-    t = np.arange(0, 1e6, 2000)
+    t = np.arange(0, n_iter, 2000)
     labels = ['Random', 'Publications', 'False pos. rate']
     colors = ['red', 'blue', 'black']
 
