@@ -1,4 +1,5 @@
 import warnings
+from mpl_toolkits.axes_grid1 import AxesGrid
 warnings.simplefilter('ignore')
 
 import json
@@ -126,10 +127,114 @@ def pub_plot_award_experiment(experiment_dir='../fundingExperiment',
         ax.set_xlim(0.0, 1e6)
         ax.set_ylim(-0.05, 1.05)
         ax.set_xticks([0.0, 5e5, 1e6])
-        ax.set_xticklabels(['0', r'$5 \times 10^5$', r'$10^6$'], size=lab_size - 3)
+        ax.set_xticklabels(['0', r'$5 \times 10^5$', r'$10^6$'],
+                           size=lab_size - 3)
 
     if save_path is not None:
         plt.savefig(save_path)
+
+
+class DataDir:
+
+    def __init__(self, data_dir):
+
+        self.data_dir = data_dir
+        self.jsons = _get_jsons(data_dir)
+        self.metadatas = [j['metadata'] for j in self.jsons]
+
+        p = 'parameters'
+        keys = (
+            (m['policy'], m[p]['awardAmount'],
+             m[p]['publishNegativeResultRate'],
+             m[p]['falsePositiveDetectionRate'])
+            for m in self.metadatas
+        )
+
+        self.policies = [m['policy'] for m in self.metadatas]
+
+        self.fpdrs = [m[p]['falsePositiveDetectionRate']
+                      for m in self.metadatas]
+
+        self.pubneg_rates = [m[p]['publishNegativeResultRate']
+                             for m in self.metadatas]
+
+        self.awardAmounts = [m[p]['awardAmount'] for m in self.metadatas]
+
+        self.d = dict(zip(keys, self.jsons))
+
+    def __getitem__(self, key):
+
+        return self.d[key]
+
+
+def heatmaps(data, award_amounts=[10, 40, 70],
+             policies=['FPR', 'RANDOM', 'PUBLICATIONS'],
+             fpdrs=[0.1, 0.25, 0.75, 0.9],
+             negres_pub_rates=[0.1, 0.25, 0.75, 0.9]):
+
+    if type(data) is str:
+        d = DataDir(data).d
+    elif type(data) is dict:
+        d = data
+
+    # fig, axes = plt.subplots(
+    #     nrows=len(award_amounts), ncols=len(policies),
+    #     figsize=(8, 11.5)
+    # )
+    fig = plt.figure(figsize=(7, 10))
+    grid = AxesGrid(fig, 111, nrows_ncols=(len(award_amounts), len(policies)),
+                    axes_pad=.65, cbar_mode='single', cbar_location='bottom',
+                    cbar_pad=0.25, cbar_size='4%'
+                    )
+    # fig.subplots_adjust(top=0.1) #, top=1.0)
+    # cax = fig.add_axes([0.2, 0.01, 0.5, 0.04])
+
+    mats = []
+    ax_idx = 0
+    for award_idx, award_amount in enumerate(award_amounts):
+        for policy_idx, policy in enumerate(policies):
+            hmdict = {
+                (k[2], k[3]): _ave_final_pol(v)
+                for k, v in d.items()
+                if k[0] == policy and k[1] == award_amount
+            }
+
+            hmdata = np.zeros((4, 4))
+            for ii, x in enumerate(fpdrs):
+                for jj, y in enumerate(negres_pub_rates):
+                    hmdata[ii, jj] = hmdict[(x, y)]
+
+            ax = grid[ax_idx]
+            ax_idx += 1
+            mats.append(ax.imshow(hmdata, origin='lower', vmin=0.0, vmax=1.0))
+
+            # if award_idx == len(award_amounts) - 1:
+            ax.set_xlabel('False positive discovery rate')
+            if policy_idx == 0:
+                ax.set_ylabel('Neg. Res. Pub. Rate')  # , size=14)
+            ax.xaxis.set_ticks_position('bottom')
+
+            ax.set_xticklabels([''] + [fpdrs[0], fpdrs[2]], rotation=0)
+            ax.set_yticklabels([''] + negres_pub_rates)
+
+            ax.set_title('G={}, {}'.format(award_amount, policy))
+
+    # fig.colorbar(mat, ax=cax, orientation='horizontal')
+    # fig.colorbar(mats[-2], ax=axes[0,-1], orientation='vertical')
+    # fig.colorbar(mats[-2], ax=axes[1,-1], orientation='vertical')
+    # fig.colorbar(mats[-2], ax=axes[2,-1], orientation='vertical')
+    # fig.colorbar(mats[-2], ax=axes[3,-1], orientation='vertical')
+    cbar = grid.cbar_axes[0].colorbar(mats[0])
+    cbar.ax.set_xlabel('Average false positive rate')
+    cbar.ax.set_xticks([0.0, 0.5, 1.0])
+    # plt.tight_layout()
+    plt.savefig('/Users/mt/Desktop/test-heatmap.pdf', bbox_inches='tight')
+
+    return d
+
+
+def _ave_final_pol(j):
+    return np.array(j['falsePositiveRate'])[:, -1].mean()
 
 
 def plot_award_experiment_row(
