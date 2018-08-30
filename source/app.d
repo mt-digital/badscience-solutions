@@ -121,6 +121,7 @@ int main (string[] args) {
     data.funds.length = nTrials;
     data.falsePositiveRate.length = nTrials;
     data.nPublications.length = nTrials;
+    data.falseDiscoveryRate.length = nTrials;
 
     /****** RUN TRIALS IN PARALLEL ******/
     foreach (trialIdx; parallel(nTrials.iota))
@@ -136,11 +137,13 @@ int main (string[] args) {
         data.funds[trialIdx] = thisTrialData.funds;
         data.falsePositiveRate[trialIdx] = thisTrialData.falsePositiveRate;
         data.nPublications[trialIdx] = thisTrialData.nPublications;
+        data.falseDiscoveryRate[trialIdx] = thisTrialData.falseDiscoveryRate;
     }
 
     writeDir
         .buildPath(randomUUID().to!string ~ ".json")
-        .File("w").write(
+        .File("w")
+        .write(
             data.serializeToJsonString
         );
 
@@ -167,7 +170,7 @@ TimeseriesData simulation(AwardPolicy policy,
 
     /* t=0; initialize first generation of PIs */
     foreach (i; 0..N_PI)
-    {
+    { 
         pis ~= new PI();
         pis[i].funds = awardAmount;
         pis[i].falsePositiveRate = initialFalsePositiveRate;
@@ -178,7 +181,9 @@ TimeseriesData simulation(AwardPolicy policy,
     data.funds.length = N_ITER / SYNC_EVERY;
     data.falsePositiveRate.length = N_ITER / SYNC_EVERY;
     data.nPublications.length = N_ITER / SYNC_EVERY;
+    data.falseDiscoveryRate.length = N_ITER / SYNC_EVERY;
 
+    // Model iterations loop.
     foreach (iter; 0..N_ITER)
     {
         // PI's try to do research and publish it.
@@ -206,10 +211,66 @@ TimeseriesData simulation(AwardPolicy policy,
 
             data.nPublications[syncIdx] = 
                 pis.map!"a.publications".array.mean;
+
+            data.falseDiscoveryRate[syncIdx] = pis.falseDiscoveryRate;
         }
+        // Reset whether a PI published and if it was a false discovery.
+        foreach (pi; pis)
+        {
+            pi.published = false;
+            pi.falseDiscovery = false;
+        }
+
     }
 
     return data;
+}
+unittest 
+{
+    AwardPolicy policy = AwardPolicy.FDR;
+    double awardAmount = 50.0;
+    double baseRate = 0.1;
+    double initialFalsePositiveRate = 0.1;
+    double fprMutationRate = 0.25;
+    double fprMutationMagnitude = 0.01;
+    double publishNegativeResultRate = 0.0;
+    double falsePositiveDetectionRate = 0.0;
+    size_t nIter = 10000;
+
+    TimeseriesData simData = simulation(policy, awardAmount, baseRate, 
+        initialFalsePositiveRate, fprMutationRate, fprMutationMagnitude,
+        publishNegativeResultRate, falsePositiveDetectionRate, nIter
+    );
+}
+
+
+private double falseDiscoveryRate(PI[] pis)
+{
+    return 
+        pis.map!(pi => pi.falseDiscovery.to!double).sum() / 
+            pis.map!(pi => pi.published.to!double).sum();
+}
+unittest
+{
+    PI[] pis;
+    foreach (ii; 0..10)
+        pis ~= new PI();
+    
+    foreach (ii; [0, 1, 2, 3])
+        pis[ii].falseDiscovery = true;
+    foreach (ii; [0, 1, 2, 3, 4, 5, 6, 7])
+        pis[ii].published = true;
+
+    assert(pis.falseDiscoveryRate == 0.5);
+    
+    foreach (ii; [2, 3])
+        pis[ii].falseDiscovery = false;
+
+    assert(pis.falseDiscoveryRate == 0.25);
+
+    pis[0].falseDiscovery = false;
+    pis[1].falseDiscovery = false;
+    assert(pis.falseDiscoveryRate == 0.0);
 }
 
 
@@ -233,6 +294,9 @@ class PI {
     double publishNegativeResultRate = 0.0;
     size_t publications = 0;
     size_t age = 0;
+    size_t falseDiscoveries = 0;
+    bool falseDiscovery;
+    bool published;
     UniformRange uniformRange;
     
     this() 
@@ -260,11 +324,13 @@ class PI {
                     {
                         // True positive results always published.
                         this.publications += 1;
+                        this.published = true;
                     }
                     // PI found a false negative, since hypothesis is True.
                     else if (publishNegativeResult())
                     {
                         this.publications += 1;
+                        this.published = true;
                     }
                 }
                 else
@@ -274,11 +340,14 @@ class PI {
                         !falsePositiveDetected(falsePositiveDetectionRate))
                     {
                         this.publications += 1;
+                        this.published = true;
+                        this.falseDiscovery = true;
                     }
                     // Negative result found. 
                     else if (publishNegativeResult())
                     {
                         this.publications += 1;
+                        this.published = true;
                     }
                 }
             }
@@ -294,6 +363,8 @@ class PI {
             this.funds = INIT_FUNDS;
             this.publications = 0;
             this.age = 0;
+            this.falseDiscoveries = 0;
+            this.falseDiscovery = false;
         }
 
     private:
@@ -404,11 +475,14 @@ unittest {
         pi.publications = 0;
         pi.funds = 1000;
     }
+
+    // Check that falseDiscovery can be cast to 1 if True, 0 if False
+    assert([true, false, true, true].map!(a => a.to!size_t).reduce!"a+b" == 3);
 }
 
 
 /********* GRANT APPLICATIONS **********/
-enum AwardPolicy {RANDOM, PUBLICATIONS, FPR}; 
+enum AwardPolicy {RANDOM, PUBLICATIONS, FPR, FDR}; 
 
 
 const static size_t N_APPLICANTS = 10;
@@ -437,6 +511,13 @@ private void applyForGrants(PI[] pis, double awardAmount,
 
             applicants
                 .minElement!"a.falsePositiveRate"
+                .addFunds(awardAmount);
+            break;
+
+        case AwardPolicy.FDR:
+
+            applicants
+                .minElement!"a.falseDiscoveries"
                 .addFunds(awardAmount);
             break;
     }
@@ -580,6 +661,7 @@ struct TrialsData
     double[][] funds;
     double[][] falsePositiveRate;
     double[][] nPublications;
+    double[][] falseDiscoveryRate;
 }
 
 
@@ -588,6 +670,7 @@ struct TimeseriesData
     double[] funds;
     double[] falsePositiveRate;
     double[] nPublications;
+    double[] falseDiscoveryRate;
 }
 
 

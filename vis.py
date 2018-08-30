@@ -240,7 +240,8 @@ def _ave_final_pol(j):
 def plot_award_experiment_row(
             experiment_dir='fundingExperiment', jsons=None, save_path=None,
             fundings=None, low_funding=50, high_funding=100,
-            figsize=(8, 2), axes=None, policy=None, n_iter=1e6
+            figsize=(8, 2), axes=None, policy=None, n_iter=1e6,
+            measure='falsePositiveRate'
         ):
 
     if jsons is None:
@@ -255,12 +256,20 @@ def plot_award_experiment_row(
             return (funding in fundings)
 
     # Build key=G, value=FPR-timeseries dictionary.
-    fpr_dict = {
-        (_get_amount(j), j['metadata']['policy']):
-        np.mean(j['falsePositiveRate'], axis=0)
-        for j in jsons
-        if _funding_check(_get_amount(j))
-    }
+    if measure == 'falsePositiveRate':
+        fpr_dict = {
+            (_get_amount(j), j['metadata']['policy']):
+            np.mean(j[measure], axis=0)
+            for j in jsons
+            if _funding_check(_get_amount(j))
+        }
+    elif measure == 'falseDiscoveryRate':
+        fpr_dict = {
+            (_get_amount(j), j['metadata']['policy']):
+            np.mean(j[measure], axis=0)
+            for j in jsons
+            if _funding_check(_get_amount(j))
+        }
 
     # Ascending ordered list of amounts.
     amounts = list({_get_amount(j) for j in jsons})
