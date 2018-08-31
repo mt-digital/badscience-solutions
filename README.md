@@ -65,3 +65,16 @@ for policy in RANDOM PUBLICATIONS; do
     done
 done
 ```
+
+## Data pipeline
+
+Currently there is a process that must be done to convert the directory of
+JSONs created by the distributed model runs into a single HDF. It should be
+changed to be submitted to the scheduler asap; it can be multithreaded. See
+`sandbox/multiprocessing_example.py`.  
+
+To run,
+
+```sh
+python json_to_hdf.py path/to/jsons/dir new.hdf
+```

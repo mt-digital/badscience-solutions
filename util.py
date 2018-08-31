@@ -9,7 +9,9 @@ from h5py import File
 class ExperimentData:
 
     def __init__(self, hdf_path):
+
         hdf = File(hdf_path, "r")
+
         self.policies = list(hdf.keys())
         self.award_amounts = list(
             hdf[self.policies[0]].keys()
@@ -54,12 +56,14 @@ class ExperimentData:
                 for measure in [
                             'falseDiscoveryRate',
                             'falsePositiveRate',
-                            'nPublications'
+                            'nPublications',
+                            'funds'
                         ]:
                     try:
                         hdf[group].create_dataset(
                             measure, data=np.array(j[measure], dtype='float'),
-                            compression="gzip", compression_opts=9)
+                            compression="gzip", compression_opts=9
+                        )
                     except KeyError:
                         pass
 
@@ -69,6 +73,15 @@ class ExperimentData:
         hdf.close()
 
         return cls(hdf_path)
+
+    def __getitem__(self, key):
+
+        if type(key) is tuple:
+            path = ("/{}"*len(key)).format(*key)
+        elif type(key) is str:
+            path = "/" + key
+
+        return self.hdf[path]
 
     def __del__(self):
         self.hdf.close()
