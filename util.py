@@ -1,3 +1,4 @@
+import numpy as np
 import json
 import os
 
@@ -48,21 +49,22 @@ class ExperimentData:
             group = "/{}/{}/{:.2f}/{:.2f}".format(
                 policy, award_amount, pubneg_rate, fpdr
             )
-            hdf.create_group(group)
-            for measure in [
-                        'falseDiscoveryRate',
-                        'falsePositiveRate',
-                        'nPublications'
-                    ]:
-                # group = "/{}/{}/{:.2f}/{:.2f}/{}".format(
-                #     policy, award_amount, pubneg_rate, fpdr, measure
-                # )
-                try:
-                    hdf[group].create_dataset(
-                        measure, data=j[measure],
-                        compression="gzip", compression_opts=9)
-                except KeyError:
-                    pass
+            try:
+                hdf.create_group(group)
+                for measure in [
+                            'falseDiscoveryRate',
+                            'falsePositiveRate',
+                            'nPublications'
+                        ]:
+                    try:
+                        hdf[group].create_dataset(
+                            measure, data=np.array(j[measure], dtype='float'),
+                            compression="gzip", compression_opts=9)
+                    except KeyError:
+                        pass
+
+            except ValueError:
+                pass
 
         hdf.close()
 
