@@ -16,13 +16,13 @@ class ExperimentData:
         self.award_amounts = list(
             hdf[self.policies[0]].keys()
         )
-        self.negres_rates = list(
+        self.pubneg_rates = list(
             hdf[self.policies[0]][self.award_amounts[0]].keys()
         )
         self.fpdrs = list(
             hdf[self.policies[0]][
                     self.award_amounts[0]][
-                        self.negres_rates[0]].keys()
+                        self.pubneg_rates[0]].keys()
         )
 
         self.hdf = hdf

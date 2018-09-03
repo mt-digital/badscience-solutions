@@ -1,6 +1,6 @@
 import sys
 
-from util import ExperimentData
+from experiment_data import ExperimentData
 
 
 def main(jsons_dir, dest_hdf_name):
