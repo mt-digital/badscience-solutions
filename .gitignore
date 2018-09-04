@@ -16,3 +16,4 @@ scimod-agency
 dub.selections.json
 *data*
 *.json
+*.hdf
