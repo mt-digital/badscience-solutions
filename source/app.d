@@ -204,13 +204,13 @@ TimeseriesData simulation(AwardPolicy policy,
             size_t syncIdx = iter / SYNC_EVERY;
 
             data.funds[syncIdx] = 
-                pis.map!"a.funds".array.mean;
+                pis.map!"a.funds".array;
 
             data.falsePositiveRate[syncIdx] = 
                 pis.map!"a.falsePositiveRate".array.mean;
 
             data.nPublications[syncIdx] = 
-                pis.map!"a.publications".array.mean;
+                pis.map!"a.publications.to!double".array;
 
             data.falseDiscoveryRate[syncIdx] = pis.falseDiscoveryRate;
         }
@@ -658,18 +658,18 @@ private void reproduce(
 struct TrialsData
 {
     Metadata metadata;
-    double[][] funds;
+    double[][][] funds;
     double[][] falsePositiveRate;
-    double[][] nPublications;
+    double[][][] nPublications;
     double[][] falseDiscoveryRate;
 }
 
 
 struct TimeseriesData
 {
-    double[] funds;
+    double[][] funds;
     double[] falsePositiveRate;
-    double[] nPublications;
+    double[][] nPublications;
     double[] falseDiscoveryRate;
 }
 
