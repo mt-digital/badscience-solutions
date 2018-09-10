@@ -118,9 +118,14 @@ int main (string[] args) {
         "falsePositiveDetectionRate": falsePositiveDetectionRate
     ];
 
-    data.funds.length = nTrials;
+    data.meanFunds.length = nTrials;
+    data.meanPublications.length = nTrials;
+    data.sumFunds.length = nTrials;
+    data.sumPublications.length = nTrials;
+    data.medianFunds.length = nTrials;
+    data.medianPublications.length = nTrials;
+
     data.falsePositiveRate.length = nTrials;
-    data.nPublications.length = nTrials;
     data.falseDiscoveryRate.length = nTrials;
 
     /****** RUN TRIALS IN PARALLEL ******/
@@ -134,9 +139,14 @@ int main (string[] args) {
             falsePositiveDetectionRate, N_ITER
         );
 
-        data.funds[trialIdx] = thisTrialData.funds;
+        data.meanFunds[trialIdx] = thisTrialData.meanFunds;
+        data.meanPublications[trialIdx] = thisTrialData.meanPublications;
+        data.sumFunds[trialIdx] = thisTrialData.sumFunds;
+        data.sumPublications[trialIdx] = thisTrialData.sumPublications;
+        data.medianFunds[trialIdx] = thisTrialData.medianFunds;
+        data.medianPublications[trialIdx] = thisTrialData.medianPublications;
+
         data.falsePositiveRate[trialIdx] = thisTrialData.falsePositiveRate;
-        data.nPublications[trialIdx] = thisTrialData.nPublications;
         data.falseDiscoveryRate[trialIdx] = thisTrialData.falseDiscoveryRate;
     }
 
@@ -178,9 +188,14 @@ TimeseriesData simulation(AwardPolicy policy,
     }
     
     TimeseriesData data;
-    data.funds.length = N_ITER / SYNC_EVERY;
+    data.meanFunds.length = N_ITER / SYNC_EVERY;
+    data.meanPublications.length = N_ITER / SYNC_EVERY;
+    data.sumFunds.length = N_ITER / SYNC_EVERY;
+    data.sumPublications.length = N_ITER / SYNC_EVERY;
+    data.medianFunds.length = N_ITER / SYNC_EVERY;
+    data.medianPublications.length = N_ITER / SYNC_EVERY;
+
     data.falsePositiveRate.length = N_ITER / SYNC_EVERY;
-    data.nPublications.length = N_ITER / SYNC_EVERY;
     data.falseDiscoveryRate.length = N_ITER / SYNC_EVERY;
 
     // Model iterations loop.
@@ -203,14 +218,24 @@ TimeseriesData simulation(AwardPolicy policy,
         {
             size_t syncIdx = iter / SYNC_EVERY;
 
-            data.funds[syncIdx] = 
-                pis.map!"a.funds".array;
+            data.sumFunds[syncIdx] = 
+                pis.map!"a.funds".array.sum;
+            data.meanFunds[syncIdx] = 
+                pis.map!"a.funds".array.sum;
+            double[] funds = pis.map!"a.funds".array;
+            funds.sort();
+            data.medianFunds[syncIdx] = funds[$ / 2];
+
+            data.sumPublications[syncIdx] = 
+                pis.map!"a.funds".array.sum;
+            data.meanPublications[syncIdx] = 
+                pis.map!"a.funds".array.sum;
+            double[] pubs = pis.map!"a.publications.to!double".array;
+            pubs.sort();
+            data.medianPublications[syncIdx] = pubs[$ / 2];
 
             data.falsePositiveRate[syncIdx] = 
                 pis.map!"a.falsePositiveRate".array.mean;
-
-            data.nPublications[syncIdx] = 
-                pis.map!"a.publications.to!double".array;
 
             data.falseDiscoveryRate[syncIdx] = pis.falseDiscoveryRate;
         }
@@ -658,18 +683,26 @@ private void reproduce(
 struct TrialsData
 {
     Metadata metadata;
-    double[][][] funds;
+    double[][] meanFunds;
+    double[][] meanPublications;
+    double[][] sumFunds;
+    double[][] sumPublications;
+    double[][] medianFunds;
+    double[][] medianPublications;
     double[][] falsePositiveRate;
-    double[][][] nPublications;
     double[][] falseDiscoveryRate;
 }
 
 
 struct TimeseriesData
 {
-    double[][] funds;
+    double[] meanFunds;
+    double[] meanPublications;
+    double[] sumFunds;
+    double[] sumPublications;
+    double[] medianFunds;
+    double[] medianPublications;
     double[] falsePositiveRate;
-    double[][] nPublications;
     double[] falseDiscoveryRate;
 }
 
