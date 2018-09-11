@@ -9,9 +9,10 @@
 #SBATCH -p fast.q
 
 PARAMS=`awk NR==$SLURM_ARRAY_TASK_ID $1`
+echo $PARAMS
 
-./scimod-agency "/home/scratch/mturner8/scimod/10M_funds_pubs/" \
-    --fprMutationRate=0.025 \
+./scimod-agency "/home/scratch/mturner8/scimod/10M_funds_pubs-fprMutRate=0.05-2/" \
+    --fprMutationRate=0.05 \
     --fprMutationMagnitude=0.01 \
     --initialFalsePositiveRate=0.05 \
     --nIter=10000000 \

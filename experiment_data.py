@@ -38,7 +38,9 @@ class ExperimentData:
         hdf = File(hdf_path, "w")
 
         json_files = glob(os.path.join(jsons_dir, "*"))
-        for jf in json_files:
+        n_json = len(json_files)
+        for idx, jf in enumerate(json_files):
+            print("processing JSON {}/{}".format(idx + 1, n_json))
             j = json.load(open(jf, "r"))
             md = j["metadata"]
             policy = md["policy"]
@@ -56,8 +58,12 @@ class ExperimentData:
                 for measure in [
                             'falseDiscoveryRate',
                             'falsePositiveRate',
-                            'nPublications',
-                            'funds'
+                            'meanPublications',
+                            'sumPublications',
+                            'medianPublications',
+                            'sumFunds',
+                            'medianFunds',
+                            'meanFunds'
                         ]:
                     try:
                         hdf[group].create_dataset(
