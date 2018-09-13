@@ -218,25 +218,31 @@ TimeseriesData simulation(AwardPolicy policy,
         {
             size_t syncIdx = iter / SYNC_EVERY;
 
+            /* Syncing funds information */
             data.sumFunds[syncIdx] = 
                 pis.map!"a.funds".array.sum;
             data.meanFunds[syncIdx] = 
-                pis.map!"a.funds".array.sum;
+                pis.map!"a.funds".array.mean;
+
+            // Calculate median funds.
             double[] funds = pis.map!"a.funds".array;
             funds.sort();
             data.medianFunds[syncIdx] = funds[$ / 2];
 
+            /* Syncing publications information */
             data.sumPublications[syncIdx] = 
-                pis.map!"a.funds".array.sum;
+                pis.map!"a.publications".array.sum;
             data.meanPublications[syncIdx] = 
-                pis.map!"a.funds".array.sum;
+                pis.map!"a.publications".array.mean;
             double[] pubs = pis.map!"a.publications.to!double".array;
             pubs.sort();
             data.medianPublications[syncIdx] = pubs[$ / 2];
 
+            /* Sync false positive rate */
             data.falsePositiveRate[syncIdx] = 
                 pis.map!"a.falsePositiveRate".array.mean;
 
+            /* Sync false discovery rate */
             data.falseDiscoveryRate[syncIdx] = pis.falseDiscoveryRate;
         }
         // Reset whether a PI published and if it was a false discovery.
@@ -344,23 +350,24 @@ class PI {
                 // The oracle says the hypothesis is True.
                 if (hypothesisTrue())
                 {
-                    // Uses true positive rate for this PI.
+                    // PI found a true positive.
                     if (foundPositiveGivenTrue())
                     {
                         // True positive results always published.
                         this.publications += 1;
                         this.published = true;
                     }
-                    // PI found a false negative, since hypothesis is True.
+                    // PI found a false negative.
                     else if (publishNegativeResult())
                     {
                         this.publications += 1;
                         this.published = true;
+                        this.falseDiscovery = true;
                     }
                 }
                 else
                 {
-                    // False positive not published if detected by peer review.
+                    // PI found a false positive.
                     if (foundPositiveGivenFalse() && 
                         !falsePositiveDetected(falsePositiveDetectionRate))
                     {
@@ -368,7 +375,7 @@ class PI {
                         this.published = true;
                         this.falseDiscovery = true;
                     }
-                    // Negative result found. 
+                    // PI found a true negative. 
                     else if (publishNegativeResult())
                     {
                         this.publications += 1;
