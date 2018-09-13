@@ -164,7 +164,7 @@ int main (string[] args) {
 
 const size_t N_PI = 100;
 /* size_t N_ITER = 1e6.to!size_t; */
-size_t SYNC_EVERY = 2000;
+size_t SYNC_EVERY = 10000;
 TimeseriesData simulation(AwardPolicy policy,
                 double awardAmount, double baseRate, 
                 double initialFalsePositiveRate, double fprMutationRate, 
@@ -204,14 +204,16 @@ TimeseriesData simulation(AwardPolicy policy,
         // PI's try to do research and publish it.
         pis.doScience(falsePositiveDetectionRate);
              
-        // Agency reviews "grant applications".
-        pis.applyForGrants(awardAmount, policy);
-
         // Select a PI to reproduce and a PI to die.
         pis.evolve(mutateFprNowRange, fprMutationAmountRange, 
                    awardAmount, fprMutationRate);
+
+        // After using the front element of random ranges, pop them off.
         mutateFprNowRange.popFront();
         fprMutationAmountRange.popFront();
+
+        // Agency reviews "grant applications".
+        pis.applyForGrants(awardAmount, policy);
 
         /* Sync model data for this timestep */
         if (iter % SYNC_EVERY == 0) 
@@ -221,7 +223,7 @@ TimeseriesData simulation(AwardPolicy policy,
             data.sumFunds[syncIdx] = 
                 pis.map!"a.funds".array.sum;
             data.meanFunds[syncIdx] = 
-                pis.map!"a.funds".array.sum;
+                pis.map!"a.funds".array.mean;
             double[] funds = pis.map!"a.funds".array;
             funds.sort();
             data.medianFunds[syncIdx] = funds[$ / 2];
@@ -229,7 +231,7 @@ TimeseriesData simulation(AwardPolicy policy,
             data.sumPublications[syncIdx] = 
                 pis.map!"a.funds".array.sum;
             data.meanPublications[syncIdx] = 
-                pis.map!"a.funds".array.sum;
+                pis.map!"a.funds".array.mean;
             double[] pubs = pis.map!"a.publications.to!double".array;
             pubs.sort();
             data.medianPublications[syncIdx] = pubs[$ / 2];
@@ -337,6 +339,7 @@ class PI {
     public:
         void doScience(double falsePositiveDetectionRate=0.0)
         {
+            // PI only does science if they have enough funds.
             if (this.funds >= SCIENCE_COST)
             {
                 // Pay up.
@@ -356,6 +359,7 @@ class PI {
                     {
                         this.publications += 1;
                         this.published = true;
+                        this.falseDiscovery = true;
                     }
                 }
                 else

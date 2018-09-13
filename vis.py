@@ -64,8 +64,9 @@ def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
     ax.set_title('Policy: {}, $G={}$'.format(policy, award_amount))
 
 
-def plot_means(experiment_data, params=('FPR', '10', '0.10', '0.20'),
-               ax=None, equal=True):
+def plot_means(experiment_data,
+               params=('FPR', '10', '0.10', '0.20'),
+               ax=None, equal=True, publication_measure='meanPublications'):
 
     group = experiment_data[params]
 
@@ -91,18 +92,18 @@ def plot_means(experiment_data, params=('FPR', '10', '0.10', '0.20'),
     ax.set_ylim(0, 1.0)
     ax.set_ylabel('false positive/discovery rate')
 
-    npub_arr = group['nPublications'][:].mean(axis=0)
+    npub_arr = group[publication_measure][:].mean(axis=0)
     ax2 = ax.twinx()
     lines[2] = ax2.plot(
-        npub_arr, label='nPublications', ls=linestyles[-1], color='g'
+        npub_arr, label='pubs', ls=linestyles[-1], color='g'
     )
-    ax2.set_ylabel('nPublications', color='g')
+    ax2.set_ylabel('pubs', color='g')
     ax2.tick_params('y', colors='g')
 
     # labels = [l[0].get_label() for l in lines]
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    labels = ['FPR', 'FDR', 'nPubs']
+    labels = ['FPR', 'FDR', 'pubs']
     ax2.legend(lines + lines2, labels, loc=(0.5, 0.65), fontsize=6)
 
     ax.set_title(
@@ -110,7 +111,8 @@ def plot_means(experiment_data, params=('FPR', '10', '0.10', '0.20'),
     )
 
 
-def heatmaps_and_convergence_check(experiment_data):
+def heatmaps_and_convergence_check(experiment_data,
+                                   publication_measure='meanPublications'):
 
     award_amounts = [int(amt) for amt in experiment_data.award_amounts]
     award_amounts.sort()
@@ -132,9 +134,72 @@ def heatmaps_and_convergence_check(experiment_data):
                             plot_means(
                                 experiment_data,
                                 params=(policy, award_amount, fpdr, pubneg_rate),
-                                ax=axes[fpdr_idx, pubneg_idx]
+                                ax=axes[fpdr_idx, pubneg_idx],
+                                publication_measure=publication_measure
                             )
                         # In case a parameter setting got dropped, don't plot.
                         except KeyError:
                             pass
                 pdf.savefig(fig)
+
+def policy_diff_heatmap(experiment_data, award_amount):
+    '''
+    Plot a heatmap of the difference between the publications and random
+    policies to see how their outcomes differ.
+    '''
+
+    fpdrs = experiment_data.fpdrs
+    pubneg_rates = experiment_data.pubneg_rates
+
+    def order_key(a):
+        return float(a)
+
+    fpdrs.sort(key=order_key)
+    pubneg_rates.sort(key=order_key)
+
+    publications = experiment_data['PUBLICATIONS', award_amount]
+    # pubdata = publications['falseDiscoveryRate'][:]
+    random = experiment_data['RANDOM', award_amount]
+
+    hm_data = np.zeros((len(fpdrs), len(pubneg_rates)))
+    for ii, fpdr in enumerate(fpdrs):
+        for jj, pubneg_rate in enumerate(pubneg_rates):
+
+            try:
+                random_vec = random[
+                    '{}/{}'.format(fpdr, pubneg_rate)]['falseDiscoveryRate'][:]
+                publication_vec = publications[
+                    '{}/{}'.format(fpdr, pubneg_rate)
+                        ]['falseDiscoveryRate'][:]
+
+                # XXX Still have to have hack to get rid of nan, fix this!
+                random_vec[np.isnan(_data)] = 0.0
+                publication_vec[np.isnan(_data)] = 0.0
+
+                random_mean = random_vec.mean(axis=0)[-1]
+                publication_mean = publication_vec.mean(axis=0)[-1]
+                _data = random_mean - publication_mean
+            except:
+                print('fpdr: {}, pubneg_rate: {}'.format(fpdr, pubneg_rate))
+                _data = 0.0
+
+            hm_data[ii, jj] = _data
+
+    xtl = [
+        lab if idx in [0, 5, 10] else ''
+        for idx, lab in enumerate(fpdrs)
+    ]
+    ytl = [
+        lab if idx in [0, 5, 10] else ''
+        for idx, lab in enumerate(pubneg_rates)
+    ]
+    ax = sns.heatmap(hm_data,  # vmin=0.0, vmax=1.0,  # ax=ax,
+                     xticklabels=xtl, yticklabels=ytl, square=True,
+                     cmap='seismic', center=0.0, robust=True)
+    ax.set_xlabel('false positive detection rate', size=12)
+    ax.set_ylabel('negative result pub rate', size=12)
+    ax.invert_yaxis()
+
+    ax.set_title('FDR difference between publication and random policies, $G={}$'.format(award_amount))
+
+    return hm_data
