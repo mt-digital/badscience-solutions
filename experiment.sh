@@ -11,7 +11,7 @@
 PARAMS=`awk NR==$SLURM_ARRAY_TASK_ID $1`
 echo $PARAMS
 
-./scimod-agency "/home/scratch/mturner8/scimod/10M_funds_pubs-fprMutRate=0.05-2/" \
+./scimod-agency "/home/scratch/mturner8/finaldraft-scimod/" \
     --fprMutationRate=0.05 \
     --fprMutationMagnitude=0.01 \
     --initialFalsePositiveRate=0.05 \
