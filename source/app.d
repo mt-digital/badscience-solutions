@@ -281,8 +281,8 @@ unittest
 private double falseDiscoveryRate(PI[] pis)
 {
     return 
-        pis.map!(pi => pi.falseDiscovery.to!double).sum() / 
-            pis.map!(pi => pi.published.to!double).sum();
+        pis.map!(pi => pi.falseDiscovery.to!int).sum().to!double / 
+            pis.map!(pi => pi.published.to!int).sum().to!double;
 }
 unittest
 {
