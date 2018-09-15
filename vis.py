@@ -13,7 +13,7 @@ import seaborn as sns
 
 
 def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
-            measure='falseDiscoveryRate'):
+            measure='falseDiscoveryRate', ylabel=True, colorbar=False, **kwargs):
 
     fpdrs = experiment_data.fpdrs
     pubneg_rates = experiment_data.pubneg_rates
@@ -54,16 +54,41 @@ def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
         lab if idx in [0, 5, 10] else ''
         for idx, lab in enumerate(pubneg_rates)
     ]
+
     ax = sns.heatmap(hm_data, vmin=0.0, vmax=1.0, ax=ax,
                      xticklabels=xtl, yticklabels=ytl, square=True,
-                     cmap='viridis')
+                     cmap='viridis', cbar=colorbar, **kwargs)
 
     ax.set_xlabel('Negative result pub rate (NPR)', size=12)
-    ax.set_ylabel('False positive detection rate (FPDR)', size=12)
+    if ylabel:
+        ax.set_ylabel('False positive detection rate (FPDR)', size=12)
 
     ax.invert_yaxis()
 
     ax.set_title('Policy: {}, $G={}$'.format(policy, award_amount))
+
+
+def heatmaps(experiment_data, award_amount,
+             measure='falseDiscoveryRate', save_path=None, figsize=(10, 6)):
+
+    fig, axes = plt.subplots(1, 3, sharey=True, figsize=figsize)
+    cbar_ax = fig.add_axes([.99, .275, .03, .45])
+
+    colorbar = None
+    for idx, policy in enumerate(POLICIES):
+        ax = axes[idx]
+        if idx == 0:
+            heatmap(experiment_data, policy, ax=ax,
+                    measure=measure, colorbar=True,
+                    cbar_ax=cbar_ax, cbar_kws={'label': 'FDR'})
+        else:
+            heatmap(experiment_data, policy, ax=ax, measure=measure, ylabel=False)
+        # if idx == 2:
+            # heatmap(experiment_data, policy, ax=ax,
+            #         measure=measure, colorbar=True)
+    plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches='tight')
 
 
 def plot_means(experiment_data,
