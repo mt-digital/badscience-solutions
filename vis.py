@@ -8,8 +8,8 @@ import numpy as np
 import seaborn as sns
 
 
-current_palette = sns.color_palette('viridis')
-sns.set_palette(current_palette)
+# current_palette = sns.color_palette('viridis')
+# sns.set_palette(current_palette)
 
 
 def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
@@ -27,21 +27,21 @@ def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
     by_fpdr_pubneg = experiment_data[policy, award_amount]
     hm_data = np.zeros((len(fpdrs), len(pubneg_rates)))
 
-    for ii, fpdr in enumerate(fpdrs):
-        for jj, pubneg_rate in enumerate(pubneg_rates):
+    for ii, pubneg_rate in enumerate(pubneg_rates):
+        for jj, fpdr in enumerate(fpdrs):
 
             try:
                 if measure == 'falseDiscoveryRate':
-                        _data = by_fpdr_pubneg['{}/{}'.format(fpdr, pubneg_rate)
+                        _data = by_fpdr_pubneg['{}/{}'.format(pubneg_rate, fpdr)
                                                ][measure][:]
                         _data[np.isnan(_data)] = 0.0
                         _data = _data.mean(axis=0)[-1]
 
                 else:
-                    _data = by_fpdr_pubneg['{}/{}'.format(fpdr, pubneg_rate)
+                    _data = by_fpdr_pubneg['{}/{}'.format(pubneg_rate, fpdr)
                                            ][measure][:].mean(axis=0)[-1]
             except:
-                print('fpdr: {}, pubneg_rate: {}'.format(fpdr, pubneg_rate))
+                print('fpdr: {}, pubneg_rate: {}'.format(pubneg_rate, fpdr))
                 _data = np.nan
 
             hm_data[ii, jj] = _data
@@ -57,8 +57,10 @@ def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
     ax = sns.heatmap(hm_data, vmin=0.0, vmax=1.0, ax=ax,
                      xticklabels=xtl, yticklabels=ytl, square=True,
                      cmap='viridis')
-    ax.set_xlabel('false positive detection rate', size=12)
-    ax.set_ylabel('negative result pub rate', size=12)
+
+    ax.set_xlabel('Negative result pub rate (NPR)', size=12)
+    ax.set_ylabel('False positive detection rate (FPDR)', size=12)
+
     ax.invert_yaxis()
 
     ax.set_title('Policy: {}, $G={}$'.format(policy, award_amount))
@@ -107,7 +109,7 @@ def plot_means(experiment_data,
     ax2.legend(lines + lines2, labels, loc=(0.5, 0.65), fontsize=6)
 
     ax.set_title(
-        'Policy={}\nG={}\nfpdr={}\npubneg_rate={}'.format(*params), fontsize=8
+        'Policy={}\nG={}\npubneg_rate={}\nfpdr={}'.format(*params), fontsize=8
     )
 
 
@@ -128,13 +130,13 @@ def heatmaps_and_convergence_check(experiment_data,
         for award_amount in award_amounts:
             for idx, policy in enumerate(experiment_data.policies):
                 fig, axes = plt.subplots(3, 3, figsize=(8.5, 11))
-                for fpdr_idx, fpdr in enumerate(fpdrs_negrates):
-                    for pubneg_idx, pubneg_rate in enumerate(fpdrs_negrates):
+                for pubneg_idx, pubneg_rate in enumerate(fpdrs_negrates):
+                    for fpdr_idx, fpdr in enumerate(fpdrs_negrates):
                         try:
                             plot_means(
                                 experiment_data,
-                                params=(policy, award_amount, fpdr, pubneg_rate),
-                                ax=axes[fpdr_idx, pubneg_idx],
+                                params=(policy, award_amount, pubneg_rate, fpdr),
+                                ax=axes[pubneg_idx, fpdr_idx],
                                 publication_measure=publication_measure
                             )
                         # In case a parameter setting got dropped, don't plot.
@@ -203,3 +205,56 @@ def policy_diff_heatmap(experiment_data, award_amount):
     ax.set_title('FDR difference between publication and random policies, $G={}$'.format(award_amount))
 
     return hm_data
+
+def measure_vs_pubparams(experiment_data,
+                         award_amounts=['10', '35', '60', '85'],
+                         param='NPR',
+                         measure='FPR'):
+    '''
+    Plot either FPR or FDR for different award amounts over all publishing
+    parameter values; parameter is either false positive discovery rate ('FPDR')
+    or negative (result) publishing rate ('NPR').
+    '''
+    pass
+
+
+POLICIES = ['PUBLICATIONS', 'RANDOM', 'FPR']
+
+def policies_timeseries(experiment_data,
+                        award_amounts=['10', '35', '60', '85'],
+                        lcs=['blue', 'red', 'black'],
+                        figsize=(6, 5),
+                        save_path=None):
+
+    fig, axes = plt.subplots(2, 2, sharex=True, sharey=True, figsize=figsize)
+
+    for g_idx, award_amount in enumerate(award_amounts):
+        ax = axes.flatten()[g_idx]
+
+        for p_idx, policy in enumerate(POLICIES):
+
+            data = experiment_data[policy, award_amount, '0.00', '0.00']
+
+            fdr = data['falseDiscoveryRate'][:]
+            fdr[np.isnan(fdr)] = 0.0
+
+            fpr = data['falsePositiveRate'][:]
+
+            ax.plot(fdr.mean(axis=0), label='FDR - {}'.format(policy),
+                     color=lcs[p_idx])
+
+            ax.plot(fpr.mean(axis=0), label='FPR - {}'.format(policy),
+                     color=lcs[p_idx], ls='--')
+
+        ax.set_title('$G={}$'.format(award_amount))
+        ax.set_xticks([0, 500, 1000])
+        ax.set_xticklabels(['0', '5e6', '10e6'])
+        if g_idx % 2 == 0:
+            ax.set_ylabel('FPR, FDR', size=12)
+        if g_idx > 1:
+            ax.set_xlabel('Iteration', size=12)
+        if g_idx == 3:
+            ax.legend()
+
+    if save_path is not None:
+        plt.savefig(save_path)
