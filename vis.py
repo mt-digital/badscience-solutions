@@ -59,9 +59,9 @@ def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
                      xticklabels=xtl, yticklabels=ytl, square=True,
                      cmap='viridis', cbar=colorbar, **kwargs)
 
-    ax.set_xlabel('Negative result pub rate (NPR)', size=12)
+    ax.set_xlabel('False positive detection rate (FPDR)', size=12)
     if ylabel:
-        ax.set_ylabel('False positive detection rate (FPDR)', size=12)
+        ax.set_ylabel('Negative result pub rate (NPR)', size=12)
 
     ax.invert_yaxis()
 
@@ -78,15 +78,17 @@ def heatmaps(experiment_data, award_amount,
     for idx, policy in enumerate(POLICIES):
         ax = axes[idx]
         if idx == 0:
+            label = 'FDR' if measure == 'falseDiscoveryRate' else 'FPR'
             heatmap(experiment_data, policy, ax=ax, award_amount=award_amount,
                     measure=measure, colorbar=True,
-                    cbar_ax=cbar_ax, cbar_kws={'label': 'FDR'})
+                    cbar_ax=cbar_ax)
         else:
             heatmap(experiment_data, policy, ax=ax, award_amount=award_amount,
                     measure=measure, ylabel=False)
         # if idx == 2:
             # heatmap(experiment_data, policy, ax=ax,
             #         measure=measure, colorbar=True)
+    ax.figure.axes[-1].set_ylabel(label, size=18)
     plt.tight_layout()
     if save_path is not None:
         plt.savefig(save_path, bbox_inches='tight')
@@ -170,7 +172,8 @@ def heatmaps_and_convergence_check(experiment_data,
                             pass
                 pdf.savefig(fig)
 
-def policy_diff_heatmap(experiment_data, award_amount):
+def policy_diff_heatmap(experiment_data, award_amount,
+                        measure='falseDiscoveryRate'):
     '''
     Plot a heatmap of the difference between the publications and random
     policies to see how their outcomes differ.
@@ -194,10 +197,10 @@ def policy_diff_heatmap(experiment_data, award_amount):
 
             try:
                 random_vec = random[
-                    '{}/{}'.format(pubneg_rate, fpdr)]['falseDiscoveryRate'][:]
+                    '{}/{}'.format(pubneg_rate, fpdr)][measure][:]
                 publication_vec = publications[
                     '{}/{}'.format(pubneg_rate, fpdr)
-                        ]['falseDiscoveryRate'][:]
+                        ][measure][:]
 
                 # XXX Still have to have hack to get rid of nan, fix this!
                 random_vec[np.isnan(_data)] = 0.0
@@ -223,11 +226,14 @@ def policy_diff_heatmap(experiment_data, award_amount):
     ax = sns.heatmap(hm_data,
                      xticklabels=xtl, yticklabels=ytl, square=True,
                      cmap='seismic', center=0.0, robust=True)
-    ax.set_ylabel('False positive detection rate (FPDR)', size=12)
-    ax.set_xlabel('Negative result pub rate (NPR)', size=12)
+    ax.set_ylabel('Negative result pub rate (NPR)', size=12)
+    ax.set_xlabel('False positive detection rate (FPDR)', size=12)
     ax.invert_yaxis()
+    measure_acr = 'FDR' if measure == 'falseDiscoveryRate' else 'FPR'
+    ax.figure.axes[-1].set_ylabel(
+        '${0}_{{RANDOM}} - {0}_{{PUBLICATIONS}}$'.format(measure_acr))
 
-    ax.set_title('FDR difference between publication and random policies')
+    # ax.set_title('FDR difference between publication and random policies')
 
     return hm_data
 
@@ -241,8 +247,10 @@ def measure_vs_pubparams(experiment_data,
                          policy='PUBLICATIONS',
                          measure='falseDiscoveryRate',
                          ax=None,
-                         ylab=False,
-                         legend=False):
+                         xlabel=False,
+                         ylabel=False,
+                         legend=False,
+                         title=False):
     '''
     Plot either FPR or FDR for different award amounts over all publishing
     parameter values; parameter is either false positive discovery rate ('FPDR')
@@ -272,36 +280,57 @@ def measure_vs_pubparams(experiment_data,
 
         ax.plot(data.mean(axis=1)[:, -1], 'o-', label='$G={}$'.format(award_amount))
 
-    ax.set_xticks([0, 5, 11])
+    ax.set_xticks([0, 5, 10])
     ax.set_xticklabels(['0.0', '0.5', '1.0'])
-    xlab = (
-        'False positive detection rate'
-        if param == 'FPDR'
-        else 'Negative result publish rate'
-    )
-    ax.set_xlabel(xlab)
+
+    if xlabel:
+        xlab = (
+            'False positive detection rate'
+            if param == 'FPDR'
+            else 'Negative result publish rate'
+        )
+        ax.set_xlabel(xlab)
+
     ax.set_yticks(np.arange(0, 1.01, 0.25))
-    ax.grid(True, axis='y')
-    if ylab:
-        ax.set_ylabel(ylab)
-    ax.set_title('{} award policy'.format(policy))
-    ax.set_ylim(-0.05, 1.0)
+    ax.grid(True, axis='both')
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title('{} award policy'.format(policy))
+    ax.set_ylim(-0.05, 1.05)
     if legend:
         ax.legend()
 
 
 def many_measure_vs_subparams(experiment_data, param='FPDR',
-                              figsize=(10, 2.5), save_path=None):
+                              figsize=(10, 5.5), save_path=None):
 
-    fig, axes = plt.subplots(1, 3, sharey=True, figsize=figsize)
-    legend = True
-    ylab = 'False discovery rate'
-    for p_idx, policy in enumerate(POLICIES):
-        if p_idx == 1:
+    fig, axes = plt.subplots(2, 3, sharey=True, sharex=True, figsize=figsize)
+    ax_idx = 0
+    measures = ['falseDiscoveryRate', 'falsePositiveRate']
+
+    for m_idx, measure in enumerate(measures):
+        ylabel = 'False discovery rate' if m_idx == 0 else 'False positive rate'
+        xlabel = False
+        title = True
+        legend = False
+        for p_idx, policy in enumerate(POLICIES):
+            if ax_idx == 3:
+                legend = True
+            if p_idx == 1:
+                ylabel = False
+            if m_idx == 1:
+                xlabel = True
+                title = False
+
+            measure_vs_pubparams(experiment_data, measure=measure,
+                                 param=param, policy=policy,
+                                 ax=axes.flatten()[ax_idx],
+                                 legend=legend, ylabel=ylabel, xlabel=xlabel,
+                                 title=title)
             legend = False
-            ylab = False
-        measure_vs_pubparams(experiment_data, param=param, policy=policy,
-                             ax=axes[p_idx], legend=legend, ylab=ylab)
+            ax_idx += 1
+
     plt.tight_layout()
     if save_path is not None:
         plt.savefig(save_path)
