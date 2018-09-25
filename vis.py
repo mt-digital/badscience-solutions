@@ -1,6 +1,7 @@
 import warnings
 from mpl_toolkits.axes_grid1 import AxesGrid
 from matplotlib.backends.backend_pdf import PdfPages
+from itertools import repeat
 warnings.simplefilter('ignore')
 
 import matplotlib.pyplot as plt
@@ -358,15 +359,15 @@ def policies_timeseries(experiment_data,
 
             fpr = data['falsePositiveRate'][:]
 
-            ax.plot(fdr.mean(axis=0), label='FDR - {}'.format(policy),
+            ax.plot(fdr.mean(axis=0)[:100], label='FDR - {}'.format(policy),
                      color=lcs[p_idx])
 
-            ax.plot(fpr.mean(axis=0), label='FPR - {}'.format(policy),
+            ax.plot(fpr.mean(axis=0)[:100], label='FPR - {}'.format(policy),
                      color=lcs[p_idx], ls='--')
 
         ax.set_title('$G={}$'.format(award_amount))
-        ax.set_xticks([0, 500, 1000])
-        ax.set_xticklabels(['0', '5e6', '10e6'])
+        ax.set_xticks([0, 50, 100])
+        ax.set_xticklabels(['0', '5e5', '1e6'])
 
         ax.set_yticks(np.arange(0, 1.01, 0.25))
         if g_idx % 2 == 0:
@@ -375,6 +376,72 @@ def policies_timeseries(experiment_data,
             ax.set_xlabel('Iteration', size=12)
         if g_idx == 3:
             ax.legend()
+
+        ax.grid(True)
+
+    if save_path is not None:
+        plt.savefig(save_path)
+
+
+def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 2),
+              nSteps=100, nAgents=100, lcs=['blue', 'red', 'black'],
+              param_vals=['0.10', '0.50', '0.90'],
+              save_path=None):
+
+    # if param == 'NPR':
+    #     param_vals = experiment_data.pubneg_rates
+    # elif param == 'FPDR':
+    #     param_vals = experiment_data.fpdrs
+    # else:
+    #     raise ValueError('param must be either NPR or FPDR')
+
+    ax_idx = 0
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=figsize, sharey=True)
+    x = np.array([jj for ii in range(nSteps)
+                     for jj in [ii]*nAgents
+                 ])
+
+    policies = ['PUBLICATIONS', 'RANDOM', 'FPR']
+    for pv_idx, pv in enumerate(param_vals):
+        ax = axes[ax_idx]
+        for policy_idx, policy in enumerate(policies):
+
+            if param == 'NPR':
+                try:
+                    d = experiment_data[policy, G, pv, '0.00']
+                except:
+                    print(policy, G, pv)
+                    print(list(experiment_data[policy, G, pv].keys()))
+            else:
+                d = experiment_data[policy, G, '0.00', pv]
+
+            y = d['agentFPRs'][:].flatten()[::5]
+            x = np.array([jj for ii in range(nSteps//5)
+                             for jj in [ii]*nAgents
+                        ])
+            ax.plot(x, y, '.', color=lcs[policy_idx], ms=1.5, label=policy)
+            if ax_idx == 0:
+                import matplotlib.lines as mlines
+                lines = [
+                    mlines.Line2D([], [], color=lcs[policy_idx],
+                    markersize=10, marker='.', lw=0, label=policy)
+                    for policy_idx, policy in enumerate(policies)
+                ]
+                lg = ax.legend(handles=lines, bbox_to_anchor=(0.15, .1))
+
+        if pv_idx == 0:
+            ax.set_title('{}: {}'.format(param, pv))
+            ax.set_ylabel('False positive rate')
+        else:
+            ax.set_title(str(pv))
+
+        ax.set_xlabel('Iteration')
+        ax.set_xticks([0, 10, 20])
+        ax.set_xticklabels(['0', '5e6', '1e7'])
+        ax.grid(True)
+        ax.set_xlim(-1, 21)
+
+        ax_idx += 1
 
     if save_path is not None:
         plt.savefig(save_path)

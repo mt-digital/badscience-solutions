@@ -11,11 +11,21 @@
 PARAMS=`awk NR==$SLURM_ARRAY_TASK_ID $1`
 echo $PARAMS
 
-./scimod-agency "/home/scratch/mturner8/finaldraft-scimod/" \
+
+./scimod-agency "/home/scratch/mturner8/Figs3And5" \
     --fprMutationRate=0.05 \
     --fprMutationMagnitude=0.01 \
     --initialFalsePositiveRate=0.05 \
     --nIter=10000000 \
-    --nTrials=50 \
-    --paramsList=$PARAMS
+    --nTrials=1 \
+    --paramsList=$PARAMS \
+    --syncFPRs=true
+
+# ./scimod-agency "/home/scratch/mturner8/finaldraft-scimod/" \
+#     --fprMutationRate=0.05 \
+#     --fprMutationMagnitude=0.01 \
+#     --initialFalsePositiveRate=0.05 \
+#     --nIter=10000000 \
+#     --nTrials=50 \
+#     --paramsList=$PARAMS
 

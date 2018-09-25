@@ -21,7 +21,7 @@ class ExperimentData:
         )
         self.fpdrs = list(
             hdf[self.policies[0]][
-                    self.award_amounts[0]][
+                    self.award_amounts[2]][
                         self.pubneg_rates[0]].keys()
         )
 
@@ -54,6 +54,7 @@ class ExperimentData:
                 policy, award_amount, pubneg_rate, fpdr
             )
             try:
+                print(group)
                 hdf.create_group(group)
                 for measure in [
                             'falseDiscoveryRate',
@@ -71,9 +72,18 @@ class ExperimentData:
                             compression="gzip", compression_opts=9
                         )
                     except KeyError:
+                        print('oops! key error')
                         pass
 
+                if len(j['agentFPRs']) > 0:
+                    hdf[group].create_dataset(
+                        'agentFPRs', data=np.array(j['agentFPRs'], dtype='float'),
+                        compression="gzip", compression_opts=9
+                    )
+
+
             except ValueError:
+                print('oops! val error')
                 pass
 
         hdf.close()

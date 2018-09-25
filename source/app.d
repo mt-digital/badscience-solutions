@@ -131,6 +131,8 @@ int main (string[] args) {
     data.falsePositiveRate.length = nTrials;
     data.falseDiscoveryRate.length = nTrials;
 
+    data.agentFPRs.length = nTrials;
+
     /****** RUN TRIALS IN PARALLEL ******/
     foreach (trialIdx; parallel(nTrials.iota))
     {
@@ -151,6 +153,8 @@ int main (string[] args) {
 
         data.falsePositiveRate[trialIdx] = thisTrialData.falsePositiveRate;
         data.falseDiscoveryRate[trialIdx] = thisTrialData.falseDiscoveryRate;
+
+        data.agentFPRs[trialIdx] = thisTrialData.agentFPRs;
     }
 
     writeDir
