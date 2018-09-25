@@ -43,6 +43,7 @@ int main (string[] args) {
     double falsePositiveDetectionRate = 0.0;
     double grantApplicationCost = 0.0;
     string paramsList = "";
+    bool syncFPRs;
     AwardPolicy policy = AwardPolicy.FPR;
 
     auto helpInformation = getopt(
@@ -69,7 +70,9 @@ int main (string[] args) {
         "policy", "One of: RANDOM, PUBLICATIONS, FPR (default PUBLICATIONS)", 
             &policy,
         "paramsList", "Comma-separated list of variable parameters, <POLICY>,<AWARD AMOUNT>,<PUB. NEG. RES. RATE>,<FALSE POS. DET. RATE>; e.g. \"FPR,5,0.5,0.9\"", 
-            &paramsList
+            &paramsList,
+        "syncFPRs", "Sync all agent FPR values at every synced timestep",
+            &syncFPRs
     );
 
     if (helpInformation.helpWanted)
@@ -136,7 +139,7 @@ int main (string[] args) {
         TimeseriesData thisTrialData = simulation(
             policy, awardAmount, baseRate, initialFalsePositiveRate,
             fprMutationRate, fprMutationMagnitude, publishNegativeResultRate,
-            falsePositiveDetectionRate, N_ITER
+            falsePositiveDetectionRate, N_ITER, syncFPRs
         );
 
         data.meanFunds[trialIdx] = thisTrialData.meanFunds;
@@ -169,7 +172,7 @@ TimeseriesData simulation(AwardPolicy policy,
                 double awardAmount, double baseRate, 
                 double initialFalsePositiveRate, double fprMutationRate, 
                 double fprMutationMagnitude, double publishNegativeResultRate,
-                double falsePositiveDetectionRate, size_t N_ITER) 
+                double falsePositiveDetectionRate, size_t N_ITER, bool syncFPRs) 
 {
     PI[] pis; 
 
@@ -197,6 +200,8 @@ TimeseriesData simulation(AwardPolicy policy,
 
     data.falsePositiveRate.length = N_ITER / SYNC_EVERY;
     data.falseDiscoveryRate.length = N_ITER / SYNC_EVERY;
+
+    data.agentFPRs.length = N_ITER / SYNC_EVERY;
 
     // Model iterations loop.
     foreach (iter; 0..N_ITER)
@@ -242,8 +247,10 @@ TimeseriesData simulation(AwardPolicy policy,
             data.medianPublications[syncIdx] = pubs[$ / 2];
 
             /* Sync false positive rate */
-            data.falsePositiveRate[syncIdx] = 
-                pis.map!"a.falsePositiveRate".array.mean;
+            double[] agentFPRs = pis.map!"a.falsePositiveRate".array;
+            data.falsePositiveRate[syncIdx] = agentFPRs.mean;
+            if (syncFPRs)
+                data.agentFPRs[syncIdx] = agentFPRs;
 
             /* Sync false discovery rate */
             data.falseDiscoveryRate[syncIdx] = pis.falseDiscoveryRate;
@@ -702,6 +709,7 @@ struct TrialsData
     double[][] medianPublications;
     double[][] falsePositiveRate;
     double[][] falseDiscoveryRate;
+    double[][][] agentFPRs;
 }
 
 
@@ -715,6 +723,7 @@ struct TimeseriesData
     double[] medianPublications;
     double[] falsePositiveRate;
     double[] falseDiscoveryRate;
+    double[][] agentFPRs;
 }
 
 
