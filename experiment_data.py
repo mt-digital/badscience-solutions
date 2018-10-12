@@ -54,7 +54,6 @@ class ExperimentData:
                 policy, award_amount, pubneg_rate, fpdr
             )
             try:
-                print(group)
                 hdf.create_group(group)
                 for measure in [
                             'falseDiscoveryRate',
@@ -72,7 +71,6 @@ class ExperimentData:
                             compression="gzip", compression_opts=9
                         )
                     except KeyError:
-                        print('oops! key error')
                         pass
 
                 if len(j['agentFPRs']) > 0:
@@ -83,7 +81,6 @@ class ExperimentData:
 
 
             except ValueError:
-                print('oops! val error')
                 pass
 
         hdf.close()

@@ -1,11 +1,13 @@
 import warnings
 from mpl_toolkits.axes_grid1 import AxesGrid
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.lines as mlines
 from itertools import repeat
 warnings.simplefilter('ignore')
 
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import seaborn as sns
 
 
@@ -120,7 +122,7 @@ def plot_means(experiment_data,
 
         lines[idx] = ax.plot(m, label=var, ls=linestyles[idx])
 
-    ax.set_ylim(0, 1.0)
+    ax.set_ylim(0, 1.05)
     ax.set_ylabel('false positive/discovery rate')
 
     npub_arr = group[publication_measure][:].mean(axis=0)
@@ -135,7 +137,12 @@ def plot_means(experiment_data,
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     labels = ['FPR', 'FDR', 'pubs']
-    ax2.legend(lines + lines2, labels, loc=(0.5, 0.65), fontsize=6)
+    ax2.legend(lines + lines2, labels, loc=(0.5, 0.65),
+               fontsize=6)
+
+    ax.set_xticks([0, 500, 1000])
+    ax.set_xticklabels(['0', '5e6', '1e7'])
+    ax.set_xlabel('Iteration')
 
     ax.set_title(
         'Policy={}\nG={}\npubneg_rate={}\nfpdr={}'.format(*params), fontsize=8
@@ -143,35 +150,73 @@ def plot_means(experiment_data,
 
 
 def heatmaps_and_convergence_check(experiment_data,
-                                   publication_measure='meanPublications'):
+                                   heatmaps=True,
+                                   publication_measure='meanPublications',
+                                   save_path='heatmaps_and_conv.pdf',
+                                   save_dir=None,
+                                   figsize=(3, 3)):
+    '''
+    Create heatmaps and demonstrations of convergence for a selection of
+    parameter settings. If save_dir is not provided, a PDF of plots of behavior
+    across all three policies, all four grant funding amounts, and three
+    values each for fpdr and negative publishing rate. If save_dir is provided,
+    a separate PDF of each timeseries is created and saved to save_dir with
+    filename convention "policy_FPR-G_10-fpdr_0.2-npr_0.1.pdf".
+    '''
 
     award_amounts = [int(amt) for amt in experiment_data.award_amounts]
     award_amounts.sort()
-    with PdfPages('heatmaps_and_conv.pdf') as pdf:
-        # for award_amount in [award_amounts[0]]:
-        for award_amount in award_amounts:
-            fig, axes = plt.subplots(3, sharex=True, figsize=(8.5, 11))
-            for idx, policy in enumerate(experiment_data.policies):
-                heatmap(experiment_data, policy, award_amount, axes[idx])
-            pdf.savefig(fig)
 
-        fpdrs_negrates = ['0.20', '0.80', '0.90']
+    fpdrs_negrates = ['0.20', '0.80', '0.90']
+    # Without save directory, create a mega-PDF of all timeseries.
+    if save_dir == None:
+        with PdfPages(save_path) as pdf:
+            # for award_amount in [award_amounts[0]]:
+            if heatmaps:
+                for award_amount in award_amounts:
+                    fig, axes = plt.subplots(3, sharex=True, figsize=(8.5, 11))
+                    for idx, policy in enumerate(experiment_data.policies):
+                        heatmap(experiment_data, policy, award_amount, axes[idx])
+                    pdf.savefig(fig)
+
+            for award_amount in award_amounts:
+                for idx, policy in enumerate(experiment_data.policies):
+                    fig, axes = plt.subplots(3, 3, figsize=(8.5, 11))
+                    for pubneg_idx, pubneg_rate in enumerate(fpdrs_negrates):
+                        for fpdr_idx, fpdr in enumerate(fpdrs_negrates):
+                            try:
+                                plot_means(
+                                    experiment_data,
+                                    params=(policy, award_amount, pubneg_rate, fpdr),
+                                    ax=axes[pubneg_idx, fpdr_idx],
+                                    publication_measure=publication_measure
+                                )
+                            # In case a parameter setting got dropped, don't plot.
+                            except KeyError:
+                                pass
+                    pdf.savefig(fig)
+    else:
+        # No heatmaps, but do create PDF for each policy with name as above.
         for award_amount in award_amounts:
             for idx, policy in enumerate(experiment_data.policies):
-                fig, axes = plt.subplots(3, 3, figsize=(8.5, 11))
                 for pubneg_idx, pubneg_rate in enumerate(fpdrs_negrates):
                     for fpdr_idx, fpdr in enumerate(fpdrs_negrates):
-                        try:
+                        if pubneg_idx < 1:
+                            fig = plt.figure(figsize=figsize)
                             plot_means(
                                 experiment_data,
                                 params=(policy, award_amount, pubneg_rate, fpdr),
-                                ax=axes[pubneg_idx, fpdr_idx],
-                                publication_measure=publication_measure
+                                publication_measure=publication_measure,
+                                ax=plt.gca()
                             )
-                        # In case a parameter setting got dropped, don't plot.
-                        except KeyError:
-                            pass
-                pdf.savefig(fig)
+                            plt.savefig(
+                                os.path.join(
+                                    save_dir,
+                                    'policy_{}-G_{}-npr_{}-fpdr_{}.pdf'.format(
+                                    policy, award_amount, pubneg_rate, fpdr)
+                                )
+                            )
+
 
 def policy_diff_heatmap(experiment_data, award_amount,
                         measure='falseDiscoveryRate'):
@@ -359,9 +404,9 @@ def policies_timeseries(experiment_data,
 
             fpr = data['falsePositiveRate'][:]
 
+            # To 100 to plot only first 1M of 10M iterations.
             ax.plot(fdr.mean(axis=0)[:100], label='FDR - {}'.format(policy),
                      color=lcs[p_idx])
-
             ax.plot(fpr.mean(axis=0)[:100], label='FPR - {}'.format(policy),
                      color=lcs[p_idx], ls='--')
 
@@ -388,20 +433,25 @@ def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 2),
               param_vals=['0.10', '0.50', '0.90'],
               save_path=None):
 
-    # if param == 'NPR':
-    #     param_vals = experiment_data.pubneg_rates
-    # elif param == 'FPDR':
-    #     param_vals = experiment_data.fpdrs
-    # else:
-    #     raise ValueError('param must be either NPR or FPDR')
-
     ax_idx = 0
     fig, axes = plt.subplots(nrows=1, ncols=3, figsize=figsize, sharey=True)
-    x = np.array([jj for ii in range(nSteps)
+
+    x = np.array([jj + 1 for ii in range(nSteps // 5)
                      for jj in [ii]*nAgents
                  ])
 
     policies = ['PUBLICATIONS', 'RANDOM', 'FPR']
+
+    def _draw_legend(bbox_to_anchor=(0.15, 0.1)):
+
+        lines = [
+            mlines.Line2D([], [], color=lcs[policy_idx],
+            markersize=10, marker='.', lw=0, label=policy)
+            for policy_idx, policy in enumerate(policies)
+        ]
+        lg = ax.legend(handles=lines, loc='lower left',
+                       bbox_to_anchor=bbox_to_anchor)
+
     for pv_idx, pv in enumerate(param_vals):
         ax = axes[ax_idx]
         for policy_idx, policy in enumerate(policies):
@@ -416,18 +466,20 @@ def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 2),
                 d = experiment_data[policy, G, '0.00', pv]
 
             y = d['agentFPRs'][:].flatten()[::5]
-            x = np.array([jj for ii in range(nSteps//5)
-                             for jj in [ii]*nAgents
-                        ])
+
             ax.plot(x, y, '.', color=lcs[policy_idx], ms=1.5, label=policy)
-            if ax_idx == 0:
-                import matplotlib.lines as mlines
-                lines = [
-                    mlines.Line2D([], [], color=lcs[policy_idx],
-                    markersize=10, marker='.', lw=0, label=policy)
-                    for policy_idx, policy in enumerate(policies)
-                ]
-                lg = ax.legend(handles=lines, bbox_to_anchor=(0.15, .1))
+            if G != 60:
+                if ax_idx == 0:
+                    if G == 35 and param == 'FPDR' and pv == '0.10':
+                        _draw_legend(bbox_to_anchor=(0.15, 0.2))
+                    else:
+                        _draw_legend()
+
+            else:
+                if param == 'NPR' and ax_idx == 1 and pv == '0.50':
+                    _draw_legend()
+                elif param == 'FPDR' and ax_idx == 2 and pv == '0.90':
+                    _draw_legend(bbox_to_anchor=(0.25, 0.1))
 
         if pv_idx == 0:
             ax.set_title('{}: {}'.format(param, pv))
@@ -436,10 +488,10 @@ def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 2),
             ax.set_title(str(pv))
 
         ax.set_xlabel('Iteration')
-        ax.set_xticks([0, 10, 20])
-        ax.set_xticklabels(['0', '5e6', '1e7'])
+        ax.set_xticks([1, 10, 20])
+        ax.set_xticklabels(['1e3', '5e6', '1e7'])
         ax.grid(True)
-        ax.set_xlim(-1, 21)
+        ax.set_xlim(0, 21)
 
         ax_idx += 1
 
