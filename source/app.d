@@ -180,9 +180,9 @@ TimeseriesData simulation(AwardPolicy policy,
 {
     PI[] pis; 
 
+    // Set up random number generators.
     auto fprMutationAmountRange = 
         normalVar(0.0, fprMutationMagnitude).range;
-
     auto mutateFprNowRange = uniformVar(0.0, 1.0).range;
 
     /* t=0; initialize first generation of PIs */

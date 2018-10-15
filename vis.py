@@ -62,13 +62,15 @@ def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
                      xticklabels=xtl, yticklabels=ytl, square=True,
                      cmap='viridis', cbar=colorbar, **kwargs)
 
-    ax.set_xlabel('False positive detection rate (FPDR)', size=12)
+    ax.set_xlabel(r'False discovery det. rate, $d$', size=12)
     if ylabel:
-        ax.set_ylabel('Negative result pub rate (NPR)', size=12)
+        ax.set_ylabel(r'Neg. res. publishing rate, $n$', size=12)
 
     ax.invert_yaxis()
 
-    ax.set_title('Policy: {}, $G={}$'.format(policy, award_amount))
+    ax.set_title('Policy: {}, $G={}$'.format(
+        PAPER_POLICY_LOOKUP[policy], award_amount)
+    )
 
 
 def heatmaps(experiment_data, award_amount,
@@ -81,7 +83,7 @@ def heatmaps(experiment_data, award_amount,
     for idx, policy in enumerate(POLICIES):
         ax = axes[idx]
         if idx == 0:
-            label = 'FDR' if measure == 'falseDiscoveryRate' else 'FPR'
+            label = r'$F$' if measure == 'falseDiscoveryRate' else r'$\overline{\alpha}$'
             heatmap(experiment_data, policy, ax=ax, award_amount=award_amount,
                     measure=measure, colorbar=True,
                     cbar_ax=cbar_ax)
@@ -106,7 +108,8 @@ def plot_means(experiment_data,
     # measures = ['nPublications', 'falsePositiveRate', 'falseDiscoveryRate']
     measures = ['falsePositiveRate', 'falseDiscoveryRate']
 
-    linestyles = ['-', '--', '-.']
+    # linestyles = ['-', '--', '-.']
+    linestyles = ['-', '-', '-']
 
     if ax is None:
         fig, ax = plt.subplots()
@@ -136,16 +139,19 @@ def plot_means(experiment_data,
     # labels = [l[0].get_label() for l in lines]
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    labels = ['FPR', 'FDR', 'pubs']
-    ax2.legend(lines + lines2, labels, loc=(0.5, 0.65),
-               fontsize=6)
+    labels = [r'$\overline{\alpha}$', 'F', 'tot. pubs']
+    ax2.legend(lines + lines2, labels, loc=(0.1, 0.55), ncol=3, handlelength=1,
+               fontsize=9)
 
     ax.set_xticks([0, 500, 1000])
     ax.set_xticklabels(['0', '5e6', '1e7'])
     ax.set_xlabel('Iteration')
 
+    params = [ PAPER_POLICY_LOOKUP[params[0]] ] + list(params[1:])
     ax.set_title(
-        'Policy={}\nG={}\npubneg_rate={}\nfpdr={}'.format(*params), fontsize=8
+        # 'Policy={}\nG={}\n$n$={}\n$d$={}'.format(*params),
+        'Policy={}, G={}, $n$={}, $d$={}'.format(*params),
+        fontsize=10
     )
 
 
@@ -197,6 +203,8 @@ def heatmaps_and_convergence_check(experiment_data,
                     pdf.savefig(fig)
     else:
         # No heatmaps, but do create PDF for each policy with name as above.
+        import matplotlib as mpl
+        mpl.style.use('default')
         for award_amount in award_amounts:
             for idx, policy in enumerate(experiment_data.policies):
                 for pubneg_idx, pubneg_rate in enumerate(fpdrs_negrates):
@@ -205,7 +213,8 @@ def heatmaps_and_convergence_check(experiment_data,
                             fig = plt.figure(figsize=figsize)
                             plot_means(
                                 experiment_data,
-                                params=(policy, award_amount, pubneg_rate, fpdr),
+                                params=(policy,
+                                        award_amount, pubneg_rate, fpdr),
                                 publication_measure=publication_measure,
                                 ax=plt.gca()
                             )
@@ -327,25 +336,30 @@ def measure_vs_pubparams(experiment_data,
         ax.plot(data.mean(axis=1)[:, -1], 'o-', label='$G={}$'.format(award_amount))
 
     ax.set_xticks([0, 5, 10])
-    ax.set_xticklabels(['0.0', '0.5', '1.0'])
+    ax.set_xticklabels(['0.0', '0.5', '1.0'], fontsize=14)
 
     if xlabel:
         xlab = (
-            'False positive detection rate'
+            r'$d$'
             if param == 'FPDR'
-            else 'Negative result publish rate'
+            else r'$n$'
         )
-        ax.set_xlabel(xlab)
+        ax.set_xlabel(xlab, size=18)
 
     ax.set_yticks(np.arange(0, 1.01, 0.25))
+    ax.yaxis.set_tick_params(labelsize=14)
     ax.grid(True, axis='both')
+
     if ylabel:
-        ax.set_ylabel(ylabel)
+        ax.set_ylabel(ylabel, size=18)
     if title:
-        ax.set_title('{} award policy'.format(policy))
+        policy_in_pub = PAPER_POLICY_LOOKUP[policy]
+        ax.set_title('{} award policy'.format(policy_in_pub),
+                     size=16)
+
     ax.set_ylim(-0.05, 1.05)
     if legend:
-        ax.legend()
+        ax.legend(fontsize=12)
 
 
 def many_measure_vs_subparams(experiment_data, param='FPDR',
@@ -356,7 +370,7 @@ def many_measure_vs_subparams(experiment_data, param='FPDR',
     measures = ['falseDiscoveryRate', 'falsePositiveRate']
 
     for m_idx, measure in enumerate(measures):
-        ylabel = 'False discovery rate' if m_idx == 0 else 'False positive rate'
+        ylabel = r'$F$' if m_idx == 0 else r'$\overline{\alpha}$'
         xlabel = False
         title = True
         legend = False
@@ -383,6 +397,12 @@ def many_measure_vs_subparams(experiment_data, param='FPDR',
 
 
 POLICIES = ['PUBLICATIONS', 'RANDOM', 'FPR']
+PAPER_POLICY_LOOKUP = {
+    'PUBLICATIONS': 'PH',
+    'RANDOM': 'RA',
+    'FPR': 'MI'
+}
+
 
 def policies_timeseries(experiment_data,
                         award_amounts=['10', '35', '60', '85'],
@@ -397,6 +417,8 @@ def policies_timeseries(experiment_data,
 
         for p_idx, policy in enumerate(POLICIES):
 
+            policy_in_pub = PAPER_POLICY_LOOKUP[policy]
+
             data = experiment_data[policy, award_amount, '0.00', '0.00']
 
             fdr = data['falseDiscoveryRate'][:]
@@ -405,9 +427,11 @@ def policies_timeseries(experiment_data,
             fpr = data['falsePositiveRate'][:]
 
             # To 100 to plot only first 1M of 10M iterations.
-            ax.plot(fdr.mean(axis=0)[:100], label='FDR - {}'.format(policy),
+            ax.plot(fdr.mean(axis=0)[:100],
+                    label='{}, FDR'.format(policy_in_pub),
                      color=lcs[p_idx])
-            ax.plot(fpr.mean(axis=0)[:100], label='FPR - {}'.format(policy),
+            ax.plot(fpr.mean(axis=0)[:100],
+                    label=r'{}, $\overline{{\alpha}}$'.format(policy_in_pub),
                      color=lcs[p_idx], ls='--')
 
         ax.set_title('$G={}$'.format(award_amount))
@@ -416,11 +440,11 @@ def policies_timeseries(experiment_data,
 
         ax.set_yticks(np.arange(0, 1.01, 0.25))
         if g_idx % 2 == 0:
-            ax.set_ylabel('FPR, FDR', size=12)
+            ax.set_ylabel(r'$\overline{\alpha}$, FDR', size=12)
         if g_idx > 1:
             ax.set_xlabel('Iteration', size=12)
         if g_idx == 3:
-            ax.legend()
+            ax.legend(handlelength=1, ncol=3, bbox_to_anchor=(1.5, 0.4))
 
         ax.grid(True)
 
