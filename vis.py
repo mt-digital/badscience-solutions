@@ -62,9 +62,9 @@ def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
                      xticklabels=xtl, yticklabels=ytl, square=True,
                      cmap='viridis', cbar=colorbar, **kwargs)
 
-    ax.set_xlabel(r'False discovery det. rate, $d$', size=12)
+    ax.set_xlabel(r'efficacy of peer review, $r$', size=14)
     if ylabel:
-        ax.set_ylabel(r'Neg. res. publishing rate, $n$', size=12)
+        ax.set_ylabel(r'pub. rate of neg. results, $p$', size=14)
 
     ax.invert_yaxis()
 
@@ -340,11 +340,11 @@ def measure_vs_pubparams(experiment_data,
 
     if xlabel:
         xlab = (
-            r'$d$'
+            r'efficacy of peer review, $r$'
             if param == 'FPDR'
-            else r'$n$'
+            else r'pub. rate of neg. results, $p$'
         )
-        ax.set_xlabel(xlab, size=18)
+        ax.set_xlabel(xlab, size=14)
 
     ax.set_yticks(np.arange(0, 1.01, 0.25))
     ax.yaxis.set_tick_params(labelsize=14)
@@ -428,7 +428,7 @@ def policies_timeseries(experiment_data,
 
             # To 100 to plot only first 1M of 10M iterations.
             ax.plot(fdr.mean(axis=0)[:100],
-                    label='{}, FDR'.format(policy_in_pub),
+                    label='{}, $F$'.format(policy_in_pub),
                      color=lcs[p_idx])
             ax.plot(fpr.mean(axis=0)[:100],
                     label=r'{}, $\overline{{\alpha}}$'.format(policy_in_pub),
@@ -440,11 +440,12 @@ def policies_timeseries(experiment_data,
 
         ax.set_yticks(np.arange(0, 1.01, 0.25))
         if g_idx % 2 == 0:
-            ax.set_ylabel(r'$\overline{\alpha}$, FDR', size=12)
+            ax.set_ylabel(r'$\overline{\alpha}$, $F$', size=12)
         if g_idx > 1:
             ax.set_xlabel('Iteration', size=12)
         if g_idx == 3:
-            ax.legend(handlelength=1, ncol=3, bbox_to_anchor=(1.5, 0.4))
+            ax.legend(ncol=2)  #, bbox_to_anchor=(1.5, 0.4))
+            ax.legend(handlelength=1, ncol=3, bbox_to_anchor=(.08, 0.4))
 
         ax.grid(True)
 
