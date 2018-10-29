@@ -1,3 +1,4 @@
 notebooks/* linguist-vendored=false
 notebooks/* linguist-generated=false
 *.ipynb linguist-vendored=false
+*.ipynb linguist-vendored=false
