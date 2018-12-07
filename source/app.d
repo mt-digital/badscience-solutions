@@ -284,7 +284,8 @@ unittest
 
     TimeseriesData simData = simulation(policy, awardAmount, baseRate, 
         initialFalsePositiveRate, fprMutationRate, fprMutationMagnitude,
-        publishNegativeResultRate, falsePositiveDetectionRate, nIter
+        publishNegativeResultRate, falsePositiveDetectionRate, nIter,
+        false
     );
 }
 

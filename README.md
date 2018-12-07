@@ -42,29 +42,39 @@ Options:
 -h                       --help This help information.
 ```
 
-By writing scripts like `run_negres-peer-rev_experiment.sh`, shown below,
-we test many parameter combinations.
+#### Build the parameters files
+
+There is a command line option to pass a comma-separated tuple of the four
+parameters we varied in our experiments. The four in order are policy, award
+amount, negative results publishing rate, and false positive detection rate.
+This option is meant to be used in conjunction with the script to make files
+with one parameter tuple on each line, `experiment_makeparams.sh`:
 
 ```bash
-for policy in RANDOM PUBLICATIONS; do
-    for awardAmount in 1 `seq 5 5 115` ; do
-        for publishNegativeResultRate in 0.5 0.9; do
-            for falsePositiveDetectionRate in 0.5 0.9; do
-                echo \
-                    "policy=$policy; awardAmount=$awardAmount;"\
-                    "pubNegResRate=$publishNegativeResultRate;" \ 
-                    "falsePositiveDetectionRate=$falsePositiveDetectionRate"
-
-                qsub -S /bin/bash -q fast.q -cwd -j y -V -l mem_free=96G -pe \
-                    smp 20 -N negres-peer -o negres-peer.log -e negres-peer.err \
-                    negres-peer-rev_trials_qsub.sh $policy $awardAmount \
-                    $publishNegativeResultRate $falsePositiveDetectionRate
-
-        done
-        done
-    done
-done
+./experiment_makeparams.sh | cat > finaldraft-params.txt
 ```
+
+1452 parameter combinations are contained in `finaldraft-params.txt`.
+Because the MERCED cluster limits the number of jobs allowed in a job array to
+1000, we split the `finaldraft-params.txt` in two: 
+
+```bash
+tail -n452 finaldraft-params.txt > finaldraft-params-2.txt
+```
+
+#### Deploy job arrays to queue
+
+Job arrays make submitting many parameter combinations easy. With the parameter
+files set up using the above instructions, we submit the jobs to the cluster
+in two steps:
+
+```bash
+sbatch --array=1-1000 experiment.sh finaldraft-params.txt
+sbatch --array=1-452 experiment.sh finaldraft-params-2.txt
+```
+
+It is somewhat sloppy, but for other parameter sensitivity analysis, we just
+commented out a block of code in `experiment.sh`
 
 ## Data pipeline
 
@@ -77,4 +87,23 @@ To run,
 
 ```sh
 python json_to_hdf.py path/to/jsons/dir new.hdf
+```
+
+The HDF can be read as an `ExperimentData` instance
+
+```python
+from experiment_data import ExperimentData
+ed = ExperimentData('new.hdf')
+```
+
+This object takes advantage of Python indexing ordered as `policy`,
+`award_amount`, `pubneg_rate`, and `fpdr`. For example, 
+
+```python
+policy = 'FPR'; award_amount = 10; pubneg_rate = '0.10'; fpdr = '0.10'
+measures = ed[policy, award_amount, pubneg_rate, fpdr]
+assert list(measures.keys()) == [
+    'falseDiscoveryRate', 'falsePositiveRate', 'meanFunds', 'meanPublications', 
+    'medianFunds', 'medianPublications', 'sumFunds', 'sumPublications'
+]
 ```

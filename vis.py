@@ -333,7 +333,11 @@ def measure_vs_pubparams(experiment_data,
 
         data[np.isnan(data)] = 0.0
 
-        ax.plot(data.mean(axis=1)[:, -1], 'o-', label='$G={}$'.format(award_amount))
+        print(data.shape)
+        dm = data.mean(axis=1)[:, -1]
+        print(dm.shape)
+        print(dm)
+        ax.plot(dm, 'o-', label='$G={}$'.format(award_amount))
 
     ax.set_xticks([0, 5, 10])
     ax.set_xticklabels(['0.0', '0.5', '1.0'], fontsize=14)
@@ -346,7 +350,11 @@ def measure_vs_pubparams(experiment_data,
         )
         ax.set_xlabel(xlab, size=14)
 
-    ax.set_yticks(np.arange(0, 1.01, 0.25))
+    print(measure)
+    print('Publications' in measure)
+    if 'Publications' not in measure:
+        ax.set_ylim(-0.05, 1.05)
+        ax.set_yticks(np.arange(0, 1.01, 0.25))
     ax.yaxis.set_tick_params(labelsize=14)
     ax.grid(True, axis='both')
 
@@ -357,7 +365,6 @@ def measure_vs_pubparams(experiment_data,
         ax.set_title('{} award policy'.format(policy_in_pub),
                      size=16)
 
-    ax.set_ylim(-0.05, 1.05)
     if legend:
         ax.legend(fontsize=12)
 
@@ -453,7 +460,7 @@ def policies_timeseries(experiment_data,
         plt.savefig(save_path)
 
 
-def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 2),
+def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 1.5),
               nSteps=100, nAgents=100, lcs=['blue', 'red', 'black'],
               param_vals=['0.10', '0.50', '0.90'],
               save_path=None):
@@ -466,13 +473,14 @@ def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 2),
                  ])
 
     policies = ['PUBLICATIONS', 'RANDOM', 'FPR']
+    policies_labels = ['PH', 'RA', 'MI']
 
     def _draw_legend(bbox_to_anchor=(0.15, 0.1)):
 
         lines = [
             mlines.Line2D([], [], color=lcs[policy_idx],
             markersize=10, marker='.', lw=0, label=policy)
-            for policy_idx, policy in enumerate(policies)
+            for policy_idx, policy in enumerate(policies_labels)
         ]
         lg = ax.legend(handles=lines, loc='lower left',
                        bbox_to_anchor=bbox_to_anchor)
@@ -506,13 +514,17 @@ def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 2),
                 elif param == 'FPDR' and ax_idx == 2 and pv == '0.90':
                     _draw_legend(bbox_to_anchor=(0.25, 0.1))
 
-        if pv_idx == 0:
-            ax.set_title('{}: {}'.format(param, pv))
-            ax.set_ylabel('False positive rate')
+        # if pv_idx == 0:
+        if param == 'NPR':
+            param_label = r'$p$'
         else:
-            ax.set_title(str(pv))
+            param_label = r'$r$'
+        ax.set_title(r'{}={}'.format(param_label, pv))
+        ax.set_ylabel(r'$\alpha_i$', size=16)
+        # else:
+        #     ax.set_title(str(pv))
 
-        ax.set_xlabel('Iteration')
+        ax.set_xlabel('Iteration', size=14)
         ax.set_xticks([1, 10, 20])
         ax.set_xticklabels(['1e3', '5e6', '1e7'])
         ax.grid(True)
