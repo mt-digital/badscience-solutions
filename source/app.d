@@ -10,7 +10,7 @@ import std.json;
 import std.math: abs, approxEqual;
 import std.parallelism;
 import std.path;
-import std.random: randomSample;
+import std.random: choice, dice, randomSample;
 import std.range;
 import std.stdio;
 import std.uuid;
@@ -215,7 +215,7 @@ TimeseriesData simulation(AwardPolicy policy,
              
         // Select a PI to reproduce and a PI to die.
         pis.evolve(mutateFprNowRange, fprMutationAmountRange, 
-                   awardAmount, fprMutationRate);
+                   awardAmount, fprMutationRate, SelectionMethod.BEST_OF_TEN);
 
         // After using the front element of random ranges, pop them off.
         mutateFprNowRange.popFront();
@@ -340,6 +340,7 @@ class PI {
     double publishNegativeResultRate = 0.0;
     size_t publications = 0;
     size_t age = 0;
+    float baseRate;
     size_t falseDiscoveries = 0;
     bool falseDiscovery;
     bool published;
@@ -348,11 +349,19 @@ class PI {
     this() 
     {
         this.uniformRange = uniformVar(0.0, 1.0);
+        this.baseRate = BASE_RATE;
     }
 
     this(UniformRange uniformRange) 
     {
         this.uniformRange = uniformRange;
+        this.baseRate = BASE_RATE;
+    }
+
+    this(UniformRange uniformRange, float baseRate) 
+    {
+        this.uniformRange = uniformRange;
+        this.baseRate = baseRate;
     }
 
     public:
@@ -447,7 +456,7 @@ class PI {
 
         bool hypothesisTrue()
         {
-            bool ret = this.uniformRange.front < BASE_RATE;
+            bool ret = this.uniformRange.front < this.baseRate;
             this.uniformRange.popFront();
             return ret;
         }
@@ -495,6 +504,7 @@ unittest {
 
     // So every result is a false positive.
     BASE_RATE = 0.0; 
+    pi.baseRate = 0.0; 
     pi.falsePositiveRate = 1.0;
 
     .writeln;
@@ -509,7 +519,7 @@ unittest {
         writefln(
             "FP Detect Rate: %.2f\nUpper: %.2f\nLower: %.2f\nPubs: %d\n",
             fpDetectRate, expectedUpperLimit, expectedLowerLimit, 
-            pi.publications 
+            pi.publications, SelectionMethod.BEST_OF_TEN
         );
         if (fpDetectRate == 0.0)
         {
@@ -531,6 +541,8 @@ unittest {
 
 /********* GRANT APPLICATIONS **********/
 enum AwardPolicy {RANDOM, PUBLICATIONS, FPR, FDR}; 
+
+enum SelectionMethod {WRIGHT_FISHER, BEST_OF_TEN};
 
 
 const static size_t N_APPLICANTS = 10;
@@ -606,20 +618,50 @@ private void evolve(
         UniformRange mutateFprNowRange,
         NormalRange fprMutationAmountRange,
         double initialFunds,
-        double fprMutationRate
+        double fprMutationRate,
+        SelectionMethod selectionType
     )
 {
     // "Kill" oldest PI.
-    auto resetPI = pis.randomSample(N_TO_DIE).maxElement!"a.age";
+    PI resetPI;
+    resetPI = pis.randomSample(N_TO_DIE).maxElement!"a.age";
+    auto sameAgePIs = pis.filter!(a => a.age == resetPI.age).array;
+    if (sameAgePIs.length > 1)
+    {
+        resetPI = sameAgePIs.choice();    
+    }
     resetPI.reset();
     resetPI.funds = initialFunds;
     
     // Reproduce the one with most funding from ten chosen at random.
-    auto piToReproduce = pis.randomSample(N_TO_REPRODUCE)
-                            .maxElement!"a.publications";
+    /* auto piToReproduce = pis.randomSample(N_TO_REPRODUCE) */
+    /*                         .maxElement!"a.publications"; */
+    
+    PI piToReproduce;
+    final switch (selectionType)
+    {
+        case SelectionMethod.BEST_OF_TEN:
+            piToReproduce = pis.randomSample(N_TO_REPRODUCE)
+                               .maxElement!"a.publications";
+            break;
+
+        case SelectionMethod.WRIGHT_FISHER:
+            size_t reproducingIdx;
+            /* foreach (i; 0..10) */
+            /* { */
+            /*     reproducingIdx = dice(pis.map!"a.publications"); */
+            /*     writeln(reproducingIdx); */
+            /* } */
+            reproducingIdx = dice(pis.map!"a.publications");
+            /* writeln("Pubs in evolve: ", pis.map!"a.publications"); */
+            /* writeln("Repro idx: ", reproducingIdx); */
+            piToReproduce = pis[reproducingIdx];
+            break;
+    }
 
     piToReproduce.reproduce(
-        resetPI, mutateFprNowRange, fprMutationAmountRange, fprMutationRate
+        resetPI, mutateFprNowRange, 
+        fprMutationAmountRange, fprMutationRate
     );
 }
 unittest
@@ -643,7 +685,7 @@ unittest
     double fprMutationRate = 0.0;
     pis.evolve(
         mutateFprNowRange, fprMutationAmountRange, awardAmount, 
-        fprMutationRate
+        fprMutationRate, SelectionMethod.BEST_OF_TEN
     );
     mutateFprNowRange.popFront();
     fprMutationAmountRange.popFront();
@@ -661,12 +703,52 @@ unittest
     {
         pis.evolve(
             mutateFprNowRange, fprMutationAmountRange, awardAmount, 
-            fprMutationRate
+            fprMutationRate, SelectionMethod.BEST_OF_TEN
         );
         mutateFprNowRange.popFront();
         fprMutationAmountRange.popFront();
     }
     assert(pis.map!"a.falsePositiveRate".sum != 1.0);
+
+    size_t[] counts = 0UL.repeat().take(pis.length).array;
+    foreach (int piIdx, ref PI pi; pis)
+    {
+        pi.publications = piIdx + 1;
+        // Using FPR to identify which PI was selected; must be between 0 and 1.
+        pi.falsePositiveRate = piIdx * 0.01;
+    }
+    foreach (trialIdx; 0..1e5)
+    {
+        double mu = 0.0;
+
+        pis.evolve(
+            mutateFprNowRange, fprMutationAmountRange, awardAmount,
+            mu, SelectionMethod.WRIGHT_FISHER
+        );
+
+        // tell the selected one because it will have same falsePositiveRate
+        // as another, but the other's publications won't match (they were
+        // set equally above...this seems needlessly complicated but I'm 
+        // going with it).
+        size_t newIdx = pis.minIndex!"a.publications < b.publications";
+        PI newPI = pis[newIdx];
+
+        // New PI inherited selected PI's false positive rate, 
+        // which is its index.
+        size_t selectedIdx = (newPI.falsePositiveRate * 100).to!size_t;
+        double selectedFPR = newPI.falsePositiveRate;
+        counts[selectedIdx] += 1;
+
+        pis[newIdx].falsePositiveRate = newIdx * 0.01;
+        pis[newIdx].publications = newIdx + 1;
+    }
+    // Total publications (fitness) in population is 55.
+    // Frequency each will be chosen to reproduce is piIdx+1 / 55. 
+    auto expectedFrequencies = 1.iota(11).map!"a/55.0";
+    auto calculatedFrequencies = counts.map!(a => a.to!float / 1e5);
+    assert(approxEqual(expectedFrequencies, calculatedFrequencies, 1e-2, 1e-2),
+           "\nexpected:\n" ~ expectedFrequencies.to!string ~ "\n\ncalculated:\n" 
+           ~ calculatedFrequencies.to!string);
 }
 
 
