@@ -12,15 +12,16 @@ PARAMS=`awk NR==$SLURM_ARRAY_TASK_ID $1`
 echo $PARAMS
 
 
-./scimod-agency "/home/scratch/mturner8/Figs3And5" \
-    --fprMutationRate=0.05 \
-    --fprMutationMagnitude=0.01 \
-    --initialFalsePositiveRate=0.05 \
-    --nIter=10000000 \
-    --nTrials=1 \
-    --paramsList=$PARAMS \
-    --syncFPRs=true
+# ./scimod-agency "/home/scratch/mturner8/Figs3And5" \
+#     --fprMutationRate=0.05 \
+#     --fprMutationMagnitude=0.01 \
+#     --initialFalsePositiveRate=0.05 \
+#     --nIter=10000000 \
+#     --nTrials=1 \
+#     --paramsList=$PARAMS \
+#     --syncFPRs=true
 
+# The base parameters for the main paper results.
 # ./scimod-agency "/home/scratch/mturner8/finaldraft-scimod/" \
 #     --fprMutationRate=0.05 \
 #     --fprMutationMagnitude=0.01 \
@@ -29,3 +30,12 @@ echo $PARAMS
 #     --nTrials=50 \
 #     --paramsList=$PARAMS
 
+# Same parameters as above except testing baseRate = 0.5.
+./scimod-agency "/home/scratch/mturner8/scimod-baseRate0.5/" \
+    --fprMutationRate=0.05 \
+    --fprMutationMagnitude=0.01 \
+    --initialFalsePositiveRate=0.05 \
+    --baseRate=0.5 \
+    --nIter=10000000 \
+    --nTrials=50 \
+    --paramsList=$PARAMS
