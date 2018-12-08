@@ -89,6 +89,14 @@ To run,
 python json_to_hdf.py path/to/jsons/dir new.hdf
 ```
 
+Doing this on the cluster, you need to submit it as a job to the queue, like so
+
+```bash
+sbatch json_to_hdf_slurm.sh ~/scr/scimod-baseRate0.5/ ~/scr/scimod-baseRate0.5.hdf
+```
+for example.
+
+
 The HDF can be read as an `ExperimentData` instance
 
 ```python
