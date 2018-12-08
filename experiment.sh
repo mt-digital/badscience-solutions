@@ -31,11 +31,34 @@ echo $PARAMS
 #     --paramsList=$PARAMS
 
 # Same parameters as above except testing baseRate = 0.5.
-./scimod-agency "/home/scratch/mturner8/scimod-baseRate0.5/" \
+# ./scimod-agency "/home/scratch/mturner8/scimod-baseRate0.5/" \
+#     --fprMutationRate=0.05 \
+#     --fprMutationMagnitude=0.01 \
+#     --initialFalsePositiveRate=0.05 \
+#     --baseRate=0.5 \
+#     --nIter=10000000 \
+#     --nTrials=50 \
+#     --paramsList=$PARAMS
+
+
+# Base rate = 0.1 with Wright-Fisher selection.
+# ./scimod-agency "/home/scratch/mturner8/scimod-wright-fisher/" \
+#     --fprMutationRate=0.05 \
+#     --fprMutationMagnitude=0.01 \
+#     --initialFalsePositiveRate=0.05 \
+#     --nIter=10000000 \
+#     --selectionMethod=WRIGHT_FISHER \
+#     --nTrials=50 \
+#     --paramsList=$PARAMS
+
+# Base rate = 0.5 with Wright-Fisher selection.
+./scimod-agency "/home/scratch/mturner8/scimod-wright-fisher-b=0.5/" \
     --fprMutationRate=0.05 \
     --fprMutationMagnitude=0.01 \
     --initialFalsePositiveRate=0.05 \
-    --baseRate=0.5 \
     --nIter=10000000 \
+    --baseRate=0.5 \
+    --selectionMethod=WRIGHT_FISHER \
     --nTrials=50 \
     --paramsList=$PARAMS
+
