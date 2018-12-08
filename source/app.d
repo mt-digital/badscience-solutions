@@ -45,6 +45,7 @@ int main (string[] args) {
     string paramsList = "";
     bool syncFPRs;
     AwardPolicy policy = AwardPolicy.FPR;
+    SelectionMethod selectionMethod = SelectionMethod.BEST_OF_TEN;
 
     auto helpInformation = getopt(
         args,
@@ -69,6 +70,8 @@ int main (string[] args) {
             &falsePositiveDetectionRate,
         "policy", "One of: RANDOM, PUBLICATIONS, FPR (default PUBLICATIONS)", 
             &policy,
+        "selectionMethod", "One of: BEST_OF_TEN, WRIGHT_FISHER (default BEST_OF_TEN)", 
+            &selectionMethod,
         "paramsList", "Comma-separated list of variable parameters, <POLICY>,<AWARD AMOUNT>,<PUB. NEG. RES. RATE>,<FALSE POS. DET. RATE>; e.g. \"FPR,5,0.5,0.9\"", 
             &paramsList,
         "syncFPRs", "Sync all agent FPR values at every synced timestep",
@@ -141,7 +144,7 @@ int main (string[] args) {
         TimeseriesData thisTrialData = simulation(
             policy, awardAmount, baseRate, initialFalsePositiveRate,
             fprMutationRate, fprMutationMagnitude, publishNegativeResultRate,
-            falsePositiveDetectionRate, N_ITER, syncFPRs
+            falsePositiveDetectionRate, N_ITER, syncFPRs, selectionMethod
         );
 
         data.meanFunds[trialIdx] = thisTrialData.meanFunds;
@@ -176,7 +179,9 @@ TimeseriesData simulation(AwardPolicy policy,
                 double awardAmount, double baseRate, 
                 double initialFalsePositiveRate, double fprMutationRate, 
                 double fprMutationMagnitude, double publishNegativeResultRate,
-                double falsePositiveDetectionRate, size_t N_ITER, bool syncFPRs) 
+                double falsePositiveDetectionRate, size_t N_ITER, 
+                bool syncFPRs, SelectionMethod selectionMethod
+                ) 
 {
     PI[] pis; 
 
@@ -285,7 +290,7 @@ unittest
     TimeseriesData simData = simulation(policy, awardAmount, baseRate, 
         initialFalsePositiveRate, fprMutationRate, fprMutationMagnitude,
         publishNegativeResultRate, falsePositiveDetectionRate, nIter,
-        false
+        false, SelectionMethod.BEST_OF_TEN
     );
 }
 
@@ -519,7 +524,7 @@ unittest {
         writefln(
             "FP Detect Rate: %.2f\nUpper: %.2f\nLower: %.2f\nPubs: %d\n",
             fpDetectRate, expectedUpperLimit, expectedLowerLimit, 
-            pi.publications, SelectionMethod.BEST_OF_TEN
+            pi.publications
         );
         if (fpDetectRate == 0.0)
         {
