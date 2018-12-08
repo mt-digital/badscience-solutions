@@ -193,7 +193,7 @@ TimeseriesData simulation(AwardPolicy policy,
     /* t=0; initialize first generation of PIs */
     foreach (i; 0..N_PI)
     { 
-        pis ~= new PI();
+        pis ~= new PI(baseRate);
         pis[i].funds = awardAmount;
         pis[i].falsePositiveRate = initialFalsePositiveRate;
         pis[i].publishNegativeResultRate = publishNegativeResultRate;
@@ -345,7 +345,7 @@ class PI {
     double publishNegativeResultRate = 0.0;
     size_t publications = 0;
     size_t age = 0;
-    float baseRate;
+    float baseRate = 0.1;
     size_t falseDiscoveries = 0;
     bool falseDiscovery;
     bool published;
@@ -354,13 +354,17 @@ class PI {
     this() 
     {
         this.uniformRange = uniformVar(0.0, 1.0);
-        this.baseRate = BASE_RATE;
+    }
+
+    this(float baseRate)
+    {
+        this.uniformRange = uniformVar(0.0, 1.0);
+        this.baseRate = baseRate;
     }
 
     this(UniformRange uniformRange) 
     {
         this.uniformRange = uniformRange;
-        this.baseRate = BASE_RATE;
     }
 
     this(UniformRange uniformRange, float baseRate) 
