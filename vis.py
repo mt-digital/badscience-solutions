@@ -6,6 +6,9 @@ from itertools import repeat
 warnings.simplefilter('ignore')
 
 import matplotlib.pyplot as plt
+plt.style.use('seaborn-deep')
+
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import seaborn as sns
@@ -333,10 +336,7 @@ def measure_vs_pubparams(experiment_data,
 
         data[np.isnan(data)] = 0.0
 
-        print(data.shape)
         dm = data.mean(axis=1)[:, -1]
-        print(dm.shape)
-        print(dm)
         ax.plot(dm, 'o-', label='$G={}$'.format(award_amount))
 
     ax.set_xticks([0, 5, 10])
@@ -350,8 +350,6 @@ def measure_vs_pubparams(experiment_data,
         )
         ax.set_xlabel(xlab, size=14)
 
-    print(measure)
-    print('Publications' in measure)
     if 'Publications' not in measure:
         ax.set_ylim(-0.05, 1.05)
         ax.set_yticks(np.arange(0, 1.01, 0.25))
