@@ -219,8 +219,10 @@ TimeseriesData simulation(AwardPolicy policy,
         pis.doScience(falsePositiveDetectionRate);
              
         // Select a PI to reproduce and a PI to die.
+        /* pis.evolve(mutateFprNowRange, fprMutationAmountRange, */ 
+        /*            awardAmount, fprMutationRate, SelectionMethod.BEST_OF_TEN); */
         pis.evolve(mutateFprNowRange, fprMutationAmountRange, 
-                   awardAmount, fprMutationRate, SelectionMethod.BEST_OF_TEN);
+                   awardAmount, fprMutationRate, selectionMethod);
 
         // After using the front element of random ranges, pop them off.
         mutateFprNowRange.popFront();
