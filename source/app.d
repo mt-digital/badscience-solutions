@@ -10,7 +10,7 @@ import std.json;
 import std.math: abs, approxEqual;
 import std.parallelism;
 import std.path;
-import std.random: choice, dice, randomSample;
+import std.random: choice, dice, randomSample, randomShuffle, uniform;
 import std.range;
 import std.stdio;
 import std.uuid;
@@ -551,15 +551,33 @@ unittest {
 
 
 /********* GRANT APPLICATIONS **********/
-enum AwardPolicy {RANDOM, PUBLICATIONS, FPR, FDR}; 
+enum AwardPolicy {RANDOM, PUBLICATIONS, FPR, FDR, MODIFIED_RANDOM, MIXED}; 
 
 enum SelectionMethod {WRIGHT_FISHER, BEST_OF_TEN};
 
 
 const static size_t N_APPLICANTS = 10;
+/**
+ * applyForGrants
+ * 
+ * Considers applications from all PIs, gives a certain award amount to the
+ * winning PI, chosen according to an award policy, with some award policies
+ * requiring an additional parameter. 
+ * 
+ * Arguments:
+ *      policyParam (double): value for A in MOD_RANDOM policy or X in MIXED policy. 
+ *              A is the maximum false positive rate a PI can have to be considered for
+ *              receiving a randomized dole-out. X is the rate at which the PI with the
+ *              lowest false positive rate is awarded the grant; in the other 1-X of instances
+ *              the grant is awarded randomly with no maximum false positive rate.
+ * 
+ * Returns:
+ *      None: the PI that wins the award has their funds increased by 
+ *              awardAmount in-place.
+ */
 private void applyForGrants(PI[] pis, double awardAmount, 
                             AwardPolicy policy=AwardPolicy.RANDOM,
-                            double epsilon=0.1) 
+                            double policyParam=0.5) 
 {
     auto applicants = randomSample(pis, N_APPLICANTS);
     final switch (policy) 
@@ -591,6 +609,35 @@ private void applyForGrants(PI[] pis, double awardAmount,
                 .minElement!"a.falseDiscoveries"
                 .addFunds(awardAmount);
             break;
+
+        case AwardPolicy.MODIFIED_RANDOM:
+            applicants
+                .filter!(pi => pi.falsePositiveRate <= policyParam)
+                .array
+                .choice
+                .addFunds(awardAmount);
+            break;
+
+        case AwardPolicy.MIXED:
+            // Every policyParam (X) fraction of the time the award is given to
+            // the PI with the best false positive rate in the whole population.
+
+            // Random draw to see if the least FPR PI will get the award.
+            bool leastFPR = uniform(0f, 1f) < policyParam;
+            if (leastFPR)
+            {
+                applicants
+                    .minElement!"a.falsePositiveRate"
+                    .addFunds(awardAmount);
+            }
+            else
+            {
+                applicants
+                    .array
+                    .choice
+                    .addFunds(awardAmount);
+            }
+            break;
     }
 }
 unittest 
@@ -610,6 +657,55 @@ unittest
 
     double pubMaxFunds = pis[$-1].funds;
     assert(pubMaxFunds == INIT_FUNDS + 10.0);
+
+    // Need to turn this into a serious test for the two new funding policies.
+    // Need to make sure for different values of A and X that the 
+    // MODIFIED_RANDOM and MIXED policies use, that agents have approximately
+    // the expected funds. For MIXED one agent will be the best, and so will
+    // get the funding more regularly than the others. With MOD_RND I will set
+    // some PIs to have FPR less than and some greater than threshold, A. 
+    // Then only the ones at or below threshold will get funds added to their
+    // coffers.
+    
+    /*** MODIFIED_RANDOM ***/
+    // Set maximum false positive rate, A, to 0.4.
+    float A = 0.4;
+    // Set all PIs to have alpha above threshold. Reset their funds.
+    foreach (pi; pis)
+    {
+        pi.falsePositiveRate = 0.5;
+        pi.funds = 0.0;
+    }
+    foreach (pi; pis)
+    {
+        assert(pi.falsePositiveRate == 0.5);
+        assert(pi.funds == 0.0);
+    }
+
+    // Set a few to have alpha below threshold.
+    pis[1].falsePositiveRate = 0.1;
+    pis[2].falsePositiveRate = 0.3;
+    pis[3].falsePositiveRate = 0.2;
+
+    // Run 10k funding cycles and see that 1, 2, and 3 got roughly 3333 in funds.
+    for (int i = 0; i < 1e5; i++) 
+        pis.applyForGrants(1.0, AwardPolicy.MODIFIED_RANDOM, A);
+
+    assert(approxEqual(pis[1].funds, 33333.0), pis[1].funds.to!string);
+    assert(approxEqual(pis[2].funds, 33333.0), pis[2].funds.to!string);
+    assert(approxEqual(pis[3].funds, 33333.0), pis[3].funds.to!string);
+
+    foreach (pi; pis)
+        pi.funds = 0.0;
+
+    double X = 0.2;
+    double nFundCycles = 1e5;
+    double expectedBestPayoff = (X + (1 - X) * 0.1) * nFundCycles;
+
+    for (size_t i = 0; i < nFundCycles.to!size_t; i++) 
+        pis.applyForGrants(1.0, AwardPolicy.MIXED, X);
+
+    assert(approxEqual(pis[1].funds, expectedBestPayoff), pis[1].funds.to!string);
 }
 
 
