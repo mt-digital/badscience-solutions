@@ -594,7 +594,8 @@ private void applyForGrants(PI[] pis, double awardAmount,
         case AwardPolicy.RANDOM: 
 
             applicants
-                .front
+                .array
+                .choice
                 .addFunds(awardAmount);
             break;
 
@@ -638,12 +639,14 @@ private void applyForGrants(PI[] pis, double awardAmount,
 
             if (leastFPR)
             {
+                // Give funds to the PI with the minimum false positive rate.
                 applicants
                     .minElement!"a.falsePositiveRate"
                     .addFunds(awardAmount);
             }
             else
             {
+                // Give the funds out at random.
                 applicants
                     .array  // not sure why it has to be an array
                     .choice
