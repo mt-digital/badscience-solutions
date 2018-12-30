@@ -43,6 +43,7 @@ int main (string[] args) {
     double falsePositiveDetectionRate = 0.0;
     double grantApplicationCost = 0.0;
     string paramsList = "";
+    double policyParam = 0.0;
     bool syncFPRs;
     AwardPolicy policy = AwardPolicy.FPR;
     SelectionMethod selectionMethod = SelectionMethod.BEST_OF_TEN;
@@ -72,10 +73,12 @@ int main (string[] args) {
             &policy,
         "selectionMethod", "One of: BEST_OF_TEN, WRIGHT_FISHER (default BEST_OF_TEN)", 
             &selectionMethod,
-        "paramsList", "Comma-separated list of variable parameters, <POLICY>,<AWARD AMOUNT>,<PUB. NEG. RES. RATE>,<FALSE POS. DET. RATE>; e.g. \"FPR,5,0.5,0.9\"", 
+        "paramsList", "Comma-separated list of variable parameters, <POLICY>,<AWARD AMOUNT>,<PUB. NEG. RES. RATE>,<FALSE POS. DET. RATE>; e.g. \"FPR,5,0.5,0.9\"; Optionally add fifth parameter, the policyParam.", 
             &paramsList,
         "syncFPRs", "Sync all agent FPR values at every synced timestep",
-            &syncFPRs
+            &syncFPRs,
+        "policyParam", "Floating point parameter for either the MODIFIED_RANDOM policy (parameter A) or MIXED policy (parameter X)",
+            &policyParam
     );
 
     if (helpInformation.helpWanted)
@@ -87,24 +90,27 @@ int main (string[] args) {
         return 0;
     }
 
-    if (args.length == 1) {
+    if (args.length == 1) 
+    {
         writeln("Write directory not provided!");
         return 1;
     }
     string writeDir = args[1];
 
     // comma-separated `paramsList` overrides options if provided.
-    if (paramsList.length > 0) {
-
+    if (paramsList.length > 0) 
+    {
         auto params = paramsList.split(",");
 
-        enforce(params.length == 4, 
-                "paramsList must have four comma-separated values");
-
-        policy = params[0].to!AwardPolicy;
-        awardAmount = params[1].to!double;
-        publishNegativeResultRate = params[2].to!double;
-        falsePositiveDetectionRate = params[3].to!double;
+        if (params.length >= 4)
+        {
+            policy = params[0].to!AwardPolicy;
+            awardAmount = params[1].to!double;
+            publishNegativeResultRate = params[2].to!double;
+            falsePositiveDetectionRate = params[3].to!double;
+            if (params.length == 5)
+                policyParam = params[4].to!double;
+        }
     }
 
     defaultPoolThreads(totalCPUs);
@@ -121,7 +127,8 @@ int main (string[] args) {
         "nTrials": nTrials,
         "nIterations": N_ITER,
         "publishNegativeResultRate": publishNegativeResultRate,
-        "falsePositiveDetectionRate": falsePositiveDetectionRate
+        "falsePositiveDetectionRate": falsePositiveDetectionRate,
+        "policyParam": policyParam
     ];
 
     data.meanFunds.length = nTrials;
@@ -144,7 +151,8 @@ int main (string[] args) {
         TimeseriesData thisTrialData = simulation(
             policy, awardAmount, baseRate, initialFalsePositiveRate,
             fprMutationRate, fprMutationMagnitude, publishNegativeResultRate,
-            falsePositiveDetectionRate, N_ITER, syncFPRs, selectionMethod
+            falsePositiveDetectionRate, N_ITER, syncFPRs, selectionMethod,
+            policyParam
         );
 
         data.meanFunds[trialIdx] = thisTrialData.meanFunds;
@@ -180,7 +188,8 @@ TimeseriesData simulation(AwardPolicy policy,
                 double initialFalsePositiveRate, double fprMutationRate, 
                 double fprMutationMagnitude, double publishNegativeResultRate,
                 double falsePositiveDetectionRate, size_t N_ITER, 
-                bool syncFPRs, SelectionMethod selectionMethod
+                bool syncFPRs, SelectionMethod selectionMethod,
+                double policyParam=0.0
                 ) 
 {
     PI[] pis; 
@@ -611,11 +620,13 @@ private void applyForGrants(PI[] pis, double awardAmount,
             break;
 
         case AwardPolicy.MODIFIED_RANDOM:
+
             applicants
                 .filter!(pi => pi.falsePositiveRate <= policyParam)
                 .array
                 .choice
                 .addFunds(awardAmount);
+
             break;
 
         case AwardPolicy.MIXED:
@@ -624,6 +635,7 @@ private void applyForGrants(PI[] pis, double awardAmount,
 
             // Random draw to see if the least FPR PI will get the award.
             bool leastFPR = uniform(0f, 1f) < policyParam;
+
             if (leastFPR)
             {
                 applicants
@@ -633,7 +645,7 @@ private void applyForGrants(PI[] pis, double awardAmount,
             else
             {
                 applicants
-                    .array
+                    .array  // not sure why it has to be an array
                     .choice
                     .addFunds(awardAmount);
             }
