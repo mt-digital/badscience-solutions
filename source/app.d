@@ -238,7 +238,7 @@ TimeseriesData simulation(AwardPolicy policy,
         fprMutationAmountRange.popFront();
 
         // Agency reviews "grant applications".
-        pis.applyForGrants(awardAmount, policy);
+        pis.applyForGrants(awardAmount, policy, policyParam);
 
         /* Sync model data for this timestep */
         if (iter % SYNC_EVERY == 0) 

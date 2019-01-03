@@ -1,12 +1,15 @@
 import warnings
+
+from glob import glob
 from mpl_toolkits.axes_grid1 import AxesGrid
 from matplotlib.backends.backend_pdf import PdfPages
-import matplotlib.lines as mlines
 from itertools import repeat
 warnings.simplefilter('ignore')
 
+import json
 import matplotlib.pyplot as plt
 plt.style.use('seaborn-deep')
+import matplotlib.lines as mlines
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -139,7 +142,6 @@ def plot_means(experiment_data,
     ax2.set_ylabel('pubs', color='g')
     ax2.tick_params('y', colors='g')
 
-    # labels = [l[0].get_label() for l in lines]
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     labels = [r'$\overline{\alpha}$', 'F', 'tot. pubs']
@@ -405,7 +407,8 @@ POLICIES = ['PUBLICATIONS', 'RANDOM', 'FPR']
 PAPER_POLICY_LOOKUP = {
     'PUBLICATIONS': 'PH',
     'RANDOM': 'RA',
-    'FPR': 'MI'
+    'FPR': 'MI',
+    'MIXED': 'MIXED'
 }
 
 
@@ -532,3 +535,60 @@ def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 1.5),
 
     if save_path is not None:
         plt.savefig(save_path)
+
+
+def supplemental_policy_heatmaps(
+        json_dict=None,
+        experiment_data_dir=os.path.join('data', 'scimod-mixed-policy'),
+        policy='MIXED',
+        measure='falsePositiveRate',
+        award_amounts=[10, 35, 60, 85],
+        fpdr_npr_rates=[0.0, 0.25, 0.5, 0.75, 1.0],
+        policyParams=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    ):
+    '''
+    Because the metadata for policy parameter is not in the HDF, we have to
+    read directly from the data directory. This isn't too big a deal since
+    there are only 120 JSONs for this experiment per policy. Two policies:
+    MIXED and MODIFIED_RANDOM.
+
+    Makes eight heatmaps for each policy. One for average false positive rate
+    and one for false discovery rate.
+    '''
+    if json_dict is None:
+        jsons = (
+            json.load(open(g))
+            for g in glob(os.path.join(experiment_data_dir, '*.json'))
+        )
+        json_dict = {}
+        for j in jsons:
+            params = j['metadata']['parameters']
+            award_amount = params['awardAmount']
+            fpdr_npr = params['falsePositiveDetectionRate']
+            policy_param = params['policyParam']
+            json_dict.update({(award_amount, fpdr_npr, policy_param): j})
+
+    for amt in award_amounts:
+        amts = {k[1:]: v for k, v in json_dict.items() if k[0] == amt}
+        #### PUT HEATMAP MAKING HERE, YO! ####
+        x = fpdr_npr_rates
+        y = policyParams
+
+        data = np.zeros((len(y), len(x)))
+        for x_i, x_el in enumerate(x):
+            for y_i, y_el in enumerate(y):
+                try:
+                    predata = np.array(amts[x_el, y_el][measure])[:, -1]
+                    predata[predata == None] = 0.0
+                    data[y_i, x_i] = predata.mean()
+                except:
+                    import ipdb
+                    ipdb.set_trace()
+
+        plt.figure()
+        ax = sns.heatmap(data, vmin=0, vmax=1, xticklabels=x, yticklabels=y, cmap='viridis')
+        ax.invert_yaxis()
+
+        plt.savefig('policy_heatmap-G={}.pdf'.format(amt))
+
+    return json_dict, ax
