@@ -536,6 +536,38 @@ def fpr_allpi(experiment_data, param='NPR', G='10', figsize=(8, 1.5),
     if save_path is not None:
         plt.savefig(save_path)
 
+def _make_json_dict(experiment_data_dir):
+
+    jsons = (
+        json.load(open(g))
+        for g in glob(os.path.join(experiment_data_dir, '*.json'))
+    )
+
+    json_dict = {}
+
+    for j in jsons:
+        params = j['metadata']['parameters']
+        award_amount = params['awardAmount']
+        fpdr_npr = params['falsePositiveDetectionRate']
+        policy_param = params['policyParam']
+        # Final timestep.
+        fpr = np.array(j['falsePositiveRate'])[:, -1]
+        fdr = np.array(j['falseDiscoveryRate'])[:, -1]
+        # Take means, replacing Nones with 0's XXX.
+        fpr[fpr == None] = 0.0
+        fdr[fdr == None] = 0.0
+        fpr = fpr.mean()
+        fdr = fdr.mean()
+        json_dict.update({
+            (award_amount, fpdr_npr, policy_param):
+            {
+                'falsePositiveRate': fpr,
+                'falseDiscoveryRate': fdr
+            }
+        })
+
+    return json_dict
+
 
 def supplemental_policy_heatmaps(
         json_dict=None,
@@ -543,8 +575,9 @@ def supplemental_policy_heatmaps(
         policy='MIXED',
         measure='falsePositiveRate',
         award_amounts=[10, 35, 60, 85],
-        fpdr_npr_rates=[0.0, 0.25, 0.5, 0.75, 1.0],
-        policyParams=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        fpdr_npr_rates=[0.25, 0.5, 0.75, 1.0],
+        policy_params=[0.2, 0.4, 0.6, 0.8, 1.0],
+        figdir=os.path.expanduser('~/workspace/papers/sciencefunding/Figures/')
     ):
     '''
     Because the metadata for policy parameter is not in the HDF, we have to
@@ -556,39 +589,112 @@ def supplemental_policy_heatmaps(
     and one for false discovery rate.
     '''
     if json_dict is None:
-        jsons = (
-            json.load(open(g))
-            for g in glob(os.path.join(experiment_data_dir, '*.json'))
-        )
-        json_dict = {}
-        for j in jsons:
-            params = j['metadata']['parameters']
-            award_amount = params['awardAmount']
-            fpdr_npr = params['falsePositiveDetectionRate']
-            policy_param = params['policyParam']
-            json_dict.update({(award_amount, fpdr_npr, policy_param): j})
+        json_dict = _make_json_dict(experiment_data_dir)
 
     for amt in award_amounts:
         amts = {k[1:]: v for k, v in json_dict.items() if k[0] == amt}
-        #### PUT HEATMAP MAKING HERE, YO! ####
+
         x = fpdr_npr_rates
-        y = policyParams
+        y = policy_params
 
         data = np.zeros((len(y), len(x)))
         for x_i, x_el in enumerate(x):
             for y_i, y_el in enumerate(y):
-                try:
-                    predata = np.array(amts[x_el, y_el][measure])[:, -1]
-                    predata[predata == None] = 0.0
-                    data[y_i, x_i] = predata.mean()
-                except:
-                    import ipdb
-                    ipdb.set_trace()
+                data[y_i, x_i] = amts[x_el, y_el][measure]
+                # predata = np.array(amts[x_el, y_el][measure])[:, -1]
+                # predata[predata == None] = 0.0
+                # data[y_i, x_i] = predata.mean()
 
         plt.figure()
-        ax = sns.heatmap(data, vmin=0, vmax=1, xticklabels=x, yticklabels=y, cmap='viridis')
+
+        ax = sns.heatmap(data, vmin=0, vmax=1,
+                         xticklabels=x, yticklabels=y, cmap='viridis')
+
         ax.invert_yaxis()
 
-        plt.savefig('policy_heatmap-G={}.pdf'.format(amt))
+        title = 'G={}, policy={}, measure={}'.format(amt, policy, measure)
+
+        ax.set_title(title)
+
+        if policy == 'MODIFIED_RANDOM':
+            ylabel = r'Minimum PI $\alpha$ for grant, $A$'
+        elif policy == 'MIXED':
+            ylabel = r'Fraction of time least-$\alpha$ PI gets grant, $X$'
+        else:
+            raise ValueError('{} not a recognized policy'.format(policy))
+
+        ax.set_xlabel(r'$p=r$ (pub. rate for neg. res. and eff. of peer rev.)', size=13.25)
+
+        ax.set_ylabel(ylabel, size=14)
+
+        plt.savefig(
+            os.path.join(
+                figdir,
+                'policy_heatmap-' + title.replace(' ', '') + '.pdf'
+            )
+        )
 
     return json_dict, ax
+
+
+def all_supplemental_policy_heatmaps(
+        json_dict_modran=None,
+        json_dict_mixed=None,
+        modran_data_dir=os.path.join('data', 'scimod-modran-policy'),
+        mixed_data_dir=os.path.join('data', 'scimod-mixed-policy'),
+        award_amounts=[10, 35, 60, 85],
+        fpdr_npr_rates=[0.25, 0.5, 0.75, 1.0],
+        policy_params=[0.2, 0.4, 0.6, 0.8, 1.0]
+    ):
+
+    if json_dict_modran is None:
+        print('making MODIFIED_RANDOM data dictionary')
+        json_dict_modran = _make_json_dict(modran_data_dir)
+        import ipdb
+        ipdb.set_trace()
+
+    if json_dict_mixed is None:
+        print('making MIXED data dictionary')
+        json_dict_mixed = _make_json_dict(mixed_data_dir)
+        import ipdb
+        ipdb.set_trace()
+
+    policies = ['MODIFIED_RANDOM', 'MIXED']
+    measures = ['falsePositiveRate', 'falseDiscoveryRate']
+    jds = [json_dict_modran, json_dict_mixed]
+
+    for pidx, policy in enumerate(policies):
+
+        jd = jds[pidx]
+
+        if policy == 'MIXED':
+            policy_params = [0.0] + policy_params
+
+        for midx, measure in enumerate(measures):
+
+            print(
+                'making heatmaps for policy={} and measure={}'.format(
+                    policy, measure
+                )
+            )
+
+            if midx == 0:
+
+                data_dir = mixed_data_dir \
+                           if policy == 'MIXED' \
+                           else modran_data_dir
+
+                jd, _ = supplemental_policy_heatmaps(
+                    json_dict=jd, policy=policy, measure=measure,
+                    policy_params=policy_params
+                )
+
+            else:
+                _ = supplemental_policy_heatmaps(
+                    json_dict=jd, policy=policy, measure=measure,
+                    policy_params=policy_params
+                )
+
+    del _
+
+    return json_dict_modran, json_dict_mixed
