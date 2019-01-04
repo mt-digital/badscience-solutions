@@ -622,11 +622,17 @@ private void applyForGrants(PI[] pis, double awardAmount,
 
         case AwardPolicy.MODIFIED_RANDOM:
 
-            applicants
-                .filter!(pi => pi.falsePositiveRate <= policyParam)
-                .array
-                .choice
-                .addFunds(awardAmount);
+            PI[] suitableApplicants = 
+                applicants
+                    .filter!(pi => pi.falsePositiveRate <= policyParam)
+                    .array;
+
+            if (suitableApplicants.length > 0)
+            {
+                suitableApplicants
+                    .choice
+                    .addFunds(awardAmount);
+            }
 
             break;
 

@@ -8,16 +8,20 @@
 # Author: Matthew A. Turner <maturner01@gmail.com>
 #
 
+# 3 Jan 2019: commented out sections are commented so I can 
+# make the ten MIXED where policy param X=0.0.
 
-for policy in MODIFIED_RANDOM MIXED; do
+
+# for policy in MODIFIED_RANDOM MIXED; do
+for policy in MIXED; do
     for awardAmount in 10 35 60 85; do
         for npr_fpd_rate in `seq 0.0 0.25 1.0`; do
             # for publishNegativeResultRate in `seq 0.0 0.1 1.0`; do
             # for falsePositiveDetectionRate in `seq 0.0 0.1 1.0`; do
-            for policyParam in `seq 0.0 0.2 1.0`; do
-                echo "$policy,$awardAmount,$npr_fpd_rate,$np_fpd_rate,$policyParam"
+            # for policyParam in `seq 0.2 0.2 1.0`; do
+            echo "$policy,$awardAmount,$npr_fpd_rate,$npr_fpd_rate,0.0"
 
-            done
+            # done
         done
     done
 done
