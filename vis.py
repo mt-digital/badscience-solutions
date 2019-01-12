@@ -592,7 +592,12 @@ def supplemental_policy_heatmaps(
         json_dict = _make_json_dict(experiment_data_dir)
 
     for amt in award_amounts:
-        amts = {k[1:]: v for k, v in json_dict.items() if k[0] == amt}
+
+        amts = {
+            tuple(np.round(float(a), decimals=1) for a in k[1:]): v
+
+            for k, v in json_dict.items() if k[0] == amt
+        }
 
         x = fpdr_npr_rates
         y = policy_params
@@ -600,7 +605,22 @@ def supplemental_policy_heatmaps(
         data = np.zeros((len(y), len(x)))
         for x_i, x_el in enumerate(x):
             for y_i, y_el in enumerate(y):
-                data[y_i, x_i] = amts[x_el, y_el][measure]
+                try:
+                    data[y_i, x_i] = amts[x_el, y_el][measure]
+                except KeyError:
+                    x_el = np.round(float(x_el), decimals=1)
+                    try:
+                        data[y_i, x_i] = amts[x_el, y_el][measure]
+                    except:
+                        y_el = np.round(float(y_el), decimals=1)
+                        try:
+                            data[y_i, x_i] = amts[x_el, y_el][measure]
+                        except:
+                            import ipdb
+                            ipdb.set_trace()
+
+                    # import ipdb
+                    # ipdb.set_trace()
                 # predata = np.array(amts[x_el, y_el][measure])[:, -1]
                 # predata[predata == None] = 0.0
                 # data[y_i, x_i] = predata.mean()
@@ -608,7 +628,9 @@ def supplemental_policy_heatmaps(
         plt.figure()
 
         ax = sns.heatmap(data, vmin=0, vmax=1,
-                         xticklabels=x, yticklabels=y, cmap='viridis')
+                         xticklabels=np.round(x, 1),
+                         yticklabels=np.round(y, 1),
+                         cmap='viridis')
 
         ax.invert_yaxis()
 
@@ -617,13 +639,17 @@ def supplemental_policy_heatmaps(
         ax.set_title(title)
 
         if policy == 'MODIFIED_RANDOM':
-            ylabel = r'Minimum PI $\alpha$ for grant, $A$'
+            ylabel = r'Maximum PI $\alpha$ to get grant, $A$'
+            # ax.set_yticklabels(
+            #     ['{:.1f}'.format(x)
+            #      for x in np.arange(-1.0, 0.01, 0.1)]
+            # )
         elif policy == 'MIXED':
-            ylabel = r'Fraction of time least-$\alpha$ PI gets grant, $X$'
+            ylabel = r'$\Pr($least-$\alpha$ PI gets grant$)$, $X$'
         else:
             raise ValueError('{} not a recognized policy'.format(policy))
 
-        ax.set_xlabel(r'$p=r$ (pub. rate for neg. res. and eff. of peer rev.)', size=13.25)
+        ax.set_xlabel(r'$p=r$', size=13.25)
 
         ax.set_ylabel(ylabel, size=14)
 
@@ -636,7 +662,7 @@ def supplemental_policy_heatmaps(
 
     return json_dict, ax
 
-
+DEFAULT_POLICY_PARAMS = [0.2, 0.4, 0.6, 0.8, 1.0]
 def all_supplemental_policy_heatmaps(
         json_dict_modran=None,
         json_dict_mixed=None,
@@ -644,7 +670,8 @@ def all_supplemental_policy_heatmaps(
         mixed_data_dir=os.path.join('data', 'scimod-mixed-policy'),
         award_amounts=[10, 35, 60, 85],
         fpdr_npr_rates=[0.25, 0.5, 0.75, 1.0],
-        policy_params=[0.2, 0.4, 0.6, 0.8, 1.0]
+        policy_params_dict={'MODIFIED_RANDOM': DEFAULT_POLICY_PARAMS,
+                            'MIXED': DEFAULT_POLICY_PARAMS}
     ):
 
     if json_dict_modran is None:
@@ -667,10 +694,13 @@ def all_supplemental_policy_heatmaps(
 
         jd = jds[pidx]
 
-        if policy == 'MIXED':
+        policy_params = policy_params_dict[policy]
+
+        if policy == 'MIXED' and 0.0 not in policy_params:
             policy_params = [0.0] + policy_params
 
         for midx, measure in enumerate(measures):
+            print(policy, measure)
 
             print(
                 'making heatmaps for policy={} and measure={}'.format(
@@ -686,13 +716,13 @@ def all_supplemental_policy_heatmaps(
 
                 jd, _ = supplemental_policy_heatmaps(
                     json_dict=jd, policy=policy, measure=measure,
-                    policy_params=policy_params
+                    fpdr_npr_rates=fpdr_npr_rates, policy_params=policy_params
                 )
 
             else:
                 _ = supplemental_policy_heatmaps(
                     json_dict=jd, policy=policy, measure=measure,
-                    policy_params=policy_params
+                    fpdr_npr_rates=fpdr_npr_rates, policy_params=policy_params
                 )
 
     del _
