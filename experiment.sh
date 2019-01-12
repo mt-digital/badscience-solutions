@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --job-name=scimod-agency
+#SBATCH --job-name=mixed-final
 #SBATCH -t 0-4:00
 #SBATCH -n 20
 #SBATCH -N 1
-#SBATCH --output=logs/scimod-agency_%A_%a.out
-#SBATCH --error=logs/scimod-agency_%A_%a.err
+#SBATCH --output=logs/mixed-final_%A_%a.out
+#SBATCH --error=logs/mixed-final_%A_%a.err
 #SBATCH -p fast.q
 
 PARAMS=`awk NR==$SLURM_ARRAY_TASK_ID $1`
@@ -21,7 +21,7 @@ echo $PARAMS
 #     --syncFPRs=true
 
 # The base parameters for the main paper results.
-./scimod-agency "/home/scratch/mturner8/scimod-mixed-X=0-policy/" \
+./scimod-agency "/home/scratch/mturner8/scimod-final-modran" \
     --fprMutationRate=0.05 \
     --fprMutationMagnitude=0.01 \
     --initialFalsePositiveRate=0.05 \
