@@ -64,13 +64,26 @@ def heatmap(experiment_data, policy='FPR', award_amount='10', ax=None,
         for idx, lab in enumerate(pubneg_rates)
     ]
 
-    ax = sns.heatmap(hm_data, vmin=0.0, vmax=1.0, ax=ax,
-                     xticklabels=xtl, yticklabels=ytl, square=True,
+    ax = sns.heatmap(hm_data, vmin=0.0, vmax=1.0, ax=ax, square=True,
+                     # xticklabels=xtl, yticklabels=ytl,
                      cmap='viridis', cbar=colorbar, **kwargs)
 
-    ax.set_xlabel(r'efficacy of peer review, $r$', size=14)
+    # Magic numbers because it's time to close out this project.
+    ticks = np.arange(0, 11, 2)
+    ticklabels = ['{:.1f}'.format(r) for r in np.arange(0.0, 1.01, 0.2)]
+
+    ax.set_xticks(ticks + 0.5)
+    ax.set_xticklabels(ticklabels, size=14)
+
+    ax.set_yticks(ticks + 0.5)
+    ax.set_yticklabels(ticklabels, size=14, rotation=0)
+
+    # cbar = ax.collections[0].colorbar
+    # cbar.ax.tick_params(labelsize=13)
+
+    ax.set_xlabel(r'efficacy of peer review, $r$', size=16)
     if ylabel:
-        ax.set_ylabel(r'pub. rate of neg. results, $p$', size=14)
+        ax.set_ylabel(r'pub. rate of neg. results, $p$', size=16)
 
     ax.invert_yaxis()
 
@@ -101,6 +114,7 @@ def heatmaps(experiment_data, award_amount,
             #         measure=measure, colorbar=True)
     ax.figure.axes[-1].set_ylabel(label, size=18)
     plt.tight_layout()
+    cbar_ax.tick_params(labelsize=13)
     if save_path is not None:
         plt.savefig(save_path, bbox_inches='tight')
 
@@ -317,11 +331,13 @@ def measure_vs_pubparams(experiment_data,
     or negative (result) publishing rate ('NPR').
     '''
     import matplotlib.pyplot as plt
-    plt.style.use('seaborn-deep')
+    # plt.style.use('seaborn-deep')
 
     if ax is None:
         fig, ax = plt.subplots()
 
+    markers = ['o', 'x', 's', '^']
+    linestyles = ['-', '--', ':', '-.']
     for idx, award_amount in enumerate(award_amounts):
         if param == 'NPR':
             data = np.array(
@@ -339,7 +355,12 @@ def measure_vs_pubparams(experiment_data,
         data[np.isnan(data)] = 0.0
 
         dm = data.mean(axis=1)[:, -1]
-        ax.plot(dm, 'o-', label='$G={}$'.format(award_amount))
+
+        marker = markers[idx]
+        linestyle = linestyles[idx]
+        ax.plot(dm, ls=linestyle, marker=marker, color='k', mfc='None',
+                lw=3, alpha=0.8, markersize=10, mew=2,
+                label='$G={}$'.format(award_amount))
 
     ax.set_xticks([0, 5, 10])
     ax.set_xticklabels(['0.0', '0.5', '1.0'], fontsize=14)
@@ -634,9 +655,6 @@ def supplemental_policy_heatmaps(
 
         ax.invert_yaxis()
 
-        title = 'G={}, policy={}, measure={}'.format(amt, policy, measure)
-
-        ax.set_title(title)
 
         if policy == 'MODIFIED_RANDOM':
             ylabel = r'Maximum PI $\alpha$ to get grant, $A$'
@@ -649,14 +667,39 @@ def supplemental_policy_heatmaps(
         else:
             raise ValueError('{} not a recognized policy'.format(policy))
 
-        ax.set_xlabel(r'$p=r$', size=13.25)
+        ax.set_xlabel(r'$p=r$', size=20)
 
-        ax.set_ylabel(ylabel, size=14)
+        ax.set_ylabel(ylabel, size=20)
+        ax.tick_params(labelsize=18)
+        ax.tick_params('y', rotation=0)
 
+        ticks = np.arange(0, len(fpdr_npr_rates), 2)
+        ticklabels = ['{:.1f}'.format(r) for r in fpdr_npr_rates[::2]]
+
+        # Add offset to center tick for 11 values starting from 0.
+        ax.set_xticks(ticks + 0.5)
+        ax.set_xticklabels(ticklabels)
+
+        # In case of modified random, we don't test policy param of 0
+        if policy == 'MODIFIED_RANDOM':
+            # Add offset to center tick for 10 values starting from 0.1
+            yticks = ticks[1:] - 0.5
+            ticklabels = ticklabels[1:]
+        else:
+            # Add offset to center tick for 11 values starting from 0
+            yticks = ticks + 0.5
+
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(ticklabels)
+
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=18)
+
+        title = 'G={},policy={},measure={}'.format(amt, policy, measure)
         plt.savefig(
             os.path.join(
                 figdir,
-                'policy_heatmap-' + title.replace(' ', '') + '.pdf'
+                'policy_heatmap-' + title + '.pdf'
             )
         )
 
